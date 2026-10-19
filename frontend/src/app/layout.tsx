@@ -1,9 +1,11 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import AppShell from '@/components/AppShell';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: '稟議・承認ワークフローシステム',
-  description: 'ローカル起動確認ページ',
+  description: '稟議の申請・承認ワークスペース',
 };
 
 export default function RootLayout({
@@ -13,16 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body
-        style={{
-          margin: 0,
-          fontFamily: 'sans-serif',
-          backgroundColor: '#f8fafc',
-          color: '#0f172a',
-        }}
-      >
-        {children}
-      </body>
+      <body><AppShell>{children}</AppShell></body>
     </html>
   );
 }
