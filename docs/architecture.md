@@ -94,7 +94,8 @@ PRJ_ApprovalSystem/
 │   │   │   │   └── MasterController.php
 │   │   │   └── Requests/       # バリデーション (FormRequest)
 │   │   ├── Models/             # Eloquent モデル (Approval, User, Department 等)
-│   │   └── Services/           # 業務ロジック・状態遷移・履歴記録サービス
+│   │   ├── Repositories/       # DB操作・クエリ組み立て専任層 (ApprovalRepository, MasterRepository)
+│   │   └── Services/           # 業務ロジック・状態遷移・トランザクション制御層
 │   ├── database/
 │   │   ├── migrations/         # docs/DB.md に準拠したマイグレーション
 │   │   └── seeders/            # 初期マスタ・テスト用起案者/承認者データ
@@ -138,17 +139,15 @@ PRJ_ApprovalSystem/
 - アップロードファイル（`approval_files`）の容量制限（`client_max_body_size`）やCORSヘッダの付与を担います。
 
 ### 5.3. バックエンド設計 (Laravel)
-Controllerの肥大化を防ぎ、**「ステータス遷移の整合性」** と **「更新履歴（監査ログ）の確実な記録」** を保証するため、Service層を設けます。
+ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ステータス遷移の整合性（業務ロジック）」** と **「データアクセス（DB操作）」** を明確に分離するため、`Controller → Service → Repository → Model` の4層構造を採用します。
 
-- **Controller層**: リクエストの受取とJSONレスポンスの返却に専念。
+- **Controller層**: リクエストの受取とJSONレスポンスの返却に専念（直接ModelやRepositoryは呼ばず、Serviceのみを呼び出す）。
 - **FormRequest層**: 必須項目チェック、差し戻し時のコメント必須チェックなどを実施。
-- **Service層 (`ApprovalWorkflowService`)**:
-  - **状態遷移ガード**: 例えば「既に `1: 承認済み` の稟議に対する編集・取り下げリクエスト」や「`0: 申請中` 以外に対する承認・差し戻しリクエスト」をドメインエラー（`400` / `403`）として遮断。
-  - **DBトランザクション (`DB::transaction`)**:
-    1. `approvals` テーブルのステータス・内容を更新
-    2. 承認・差し戻し時は `approval_comments` にコメントを保存
-    3. `approval_histories` に操作ログ（「新規申請」「承認」「差し戻し」「取り下げ」「再申請」など）を自動追記
-    - 上記1〜3を単一トランザクションで実行し、データの不整合を防止。
+- **Service層 (`ApprovalWorkflowService` / `MasterService`)**:
+  - **業務ルール・状態遷移ガード**: 例えば「既に `1: 承認済み` の稟議に対する編集・取り下げリクエスト」や「`0: 申請中` 以外に対する承認・差し戻しリクエスト」をドメインエラー（`400` / `403`）として遮断。
+  - **DBトランザクション境界 (`DB::transaction`)**: 複数のRepository操作（稟議の更新、コメント追加、履歴記録）を単一トランザクションで束ね、データの不整合を防止。
+- **Repository層 (`ApprovalRepository` / `MasterRepository`)**:
+  - **DB操作・クエリ組み立て専任**: Eloquent (`Approval`, `ApprovalHistory`, `ApprovalComment`, `ApprovalFile`, `User` 等) を用いた検索フィルタの組み立て、悲観ロック (`lockForUpdate`)、レコード作成・更新処理を一元管理。
 
 ---
 
