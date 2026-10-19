@@ -1,2 +1,47 @@
+# Agent & Local Env
+# Agent & Local Env
 .agent/
+.env
+.env*.local
+.DS_Store
+
+# Frontend (Next.js / Node.js)
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backend (Laravel / PHP)
+vendor/
+backend/storage/*.key
+backend/storage/logs/*.log
+backend/bootstrap/cache/*.php
+*.sqlite
+*.sqlite-journal
+.env*.local
+.DS_Store
+
+# Frontend (Next.js / Node.js)
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backend (Laravel / PHP)
+vendor/
+backend/storage/*.key
+backend/storage/logs/*.log
+backend/bootstrap/cache/*.php
+*.sqlite
+*.sqlite-journal
 .env
