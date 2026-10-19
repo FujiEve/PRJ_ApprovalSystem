@@ -22,6 +22,20 @@ vendor/bin/phpunit --testsuite Unit
 vendor/bin/phpunit --testsuite Feature
 ```
 
+## フロントエンドテスト
+
+フロントエンドのディレクトリでテストを実行します。
+
+```sh
+cd frontend
+
+# 全テストを1回実行
+npm test
+
+# ファイル変更を監視して実行
+npm run test:watch
+```
+
 ## カバレッジ確認
 
 ブランチ（パス）カバレッジの計測には、PHPUnit 11とXdebugが必要です。Xdebugをインストール・有効化した上で、`XDEBUG_MODE=coverage` を指定します。
