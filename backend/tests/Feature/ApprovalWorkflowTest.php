@@ -155,5 +155,78 @@ class ApprovalWorkflowTest extends TestCase
         $this->assertGreaterThanOrEqual(6, count($approveRes->json('data.histories')));
         $this->assertCount(2, $approveRes->json('data.comments'));
     }
+
+    public function test_list_filters_and_hides_drafts_from_other_users(): void
+    {
+        $response = $this->getJson('/api/approvals?status_id=2&department_id=1', [
+            'X-Current-User-Id' => '3',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', 2);
+
+        $this->getJson('/api/approvals?status_id=3', ['X-Current-User-Id' => '3'])
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_create_and_show_validation_errors_are_returned(): void
+    {
+        $this->postJson('/api/approvals', [
+            'applicant_user_id' => 1,
+            'status_id' => 0,
+            'subject' => '必須項目不足',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['amount', 'detail', 'reason']);
+
+        $this->getJson('/api/approvals/99999')->assertNotFound();
+    }
+
+    public function test_only_the_applicant_can_edit_a_remanded_approval(): void
+    {
+        $payload = [
+            'user_id' => 2,
+            'assignee_user_id' => 4,
+            'status_id' => 3,
+            'subject' => '編集権限確認',
+            'amount' => 1000,
+            'detail' => '詳細',
+            'reason' => '理由',
+        ];
+
+        $this->putJson('/api/approvals/2', $payload)->assertForbidden();
+
+        $payload['user_id'] = 1;
+        $this->putJson('/api/approvals/2', $payload)
+            ->assertOk()
+            ->assertJsonPath('data.status_id', 3);
+    }
+
+    public function test_withdraw_rejects_non_pending_and_non_applicant_requests(): void
+    {
+        $this->postJson('/api/approvals/3/withdraw', ['user_id' => 2])->assertStatus(400);
+        $this->postJson('/api/approvals/1/withdraw', ['user_id' => 2])->assertForbidden();
+    }
+
+    public function test_comment_status_can_be_updated_and_invalid_values_are_rejected(): void
+    {
+        $comment = $this->postJson('/api/approvals/1/comments', [
+            'user_id' => 1,
+            'content' => '確認コメント',
+        ])->assertCreated()->json('data');
+
+        $this->patchJson("/api/approvals/1/comments/{$comment['id']}/status", ['status' => 2])
+            ->assertOk()
+            ->assertJsonPath('data.status', 2);
+
+        $this->patchJson("/api/approvals/1/comments/{$comment['id']}/status", ['status' => 9])
+            ->assertUnprocessable();
+        $this->patchJson('/api/approvals/1/comments/99999/status', ['status' => 1])
+            ->assertNotFound();
+        $this->postJson('/api/approvals/1/comments', ['user_id' => 1, 'content' => '   '])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['content']);
+    }
 }
 

@@ -21,6 +21,8 @@ vendor/
 backend/storage/*.key
 backend/storage/logs/*.log
 backend/bootstrap/cache/*.php
+backend/.phpunit.result.cache
+backend/.env
 *.sqlite
 *.sqlite-journal
 .env*.local
