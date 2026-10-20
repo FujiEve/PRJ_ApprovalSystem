@@ -31,11 +31,17 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # target 名に対応する Secrets を使う（例: RENDER_DEPLOY_HOOK_URL_NEW / BACKEND_URL_NEW）
+        target: [OLD, NEW]
+    name: deploy (${{ matrix.target }})
     steps:
       - name: Trigger Render deploy
         run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
         env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_DEPLOY_HOOK_URL: ${{ matrix.target == 'NEW' && secrets.RENDER_DEPLOY_HOOK_URL_NEW || secrets.RENDER_DEPLOY_HOOK_URL_OLD }}
 
       - name: Wait for health check
         run: |
@@ -50,4 +56,4 @@ jobs:
           echo "Health check failed"
           exit 1
         env:
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          BACKEND_URL: ${{ matrix.target == 'NEW' && secrets.BACKEND_URL_NEW || secrets.BACKEND_URL_OLD }}
