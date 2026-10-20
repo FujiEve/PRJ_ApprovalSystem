@@ -199,7 +199,7 @@ export default function ApprovalDetailPage() {
           <section className="surface action-panel">
             <span className="eyebrow">AVAILABLE ACTIONS</span>
             {canEdit && <>
-              <h2>{approval.status_id === 2 ? '修正して再申請' : '起案者の操作'}</h2>
+              <h2>{approval.status_id === 2 ? '修正して再申請' : '一般ユーザの操作'}</h2>
               <Link className="button button-outline action-full" href={`/approvals/${approval.id}/edit`}>内容を編集</Link>
               <button className="button button-primary action-full" type="button" disabled={busy} onClick={() => router.push(`/approvals/${approval.id}/edit`)}>{approval.status_id === 2 ? '再申請内容を入力' : '申請内容を入力'}</button>
             </>}

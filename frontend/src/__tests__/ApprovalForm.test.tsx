@@ -138,7 +138,7 @@ describe('ApprovalForm', () => {
 
     render(<ApprovalForm />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('起案者ユーザーに切り替えてください。');
+    expect(screen.getByRole('alert')).toHaveTextContent('一般ユーザに切り替えてください。');
     expect(screen.queryByRole('button', { name: '申請する' })).not.toBeInTheDocument();
   });
 

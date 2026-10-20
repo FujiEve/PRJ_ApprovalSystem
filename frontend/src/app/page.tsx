@@ -152,7 +152,7 @@ export default function HomePage() {
             </table>
           </div>
         )}
-        <div className="table-footer"><span>{currentUser?.authority === 'admin' ? '管理者表示' : isApprover ? '担当承認案件' : '起案案件'}</span><span>{approvals.length} 件</span></div>
+        <div className="table-footer"><span>{currentUser?.authority === 'admin' ? '管理ユーザ表示' : isApprover ? '管理ユーザの担当案件' : '一般ユーザの起案案件'}</span><span>{approvals.length} 件</span></div>
       </section>
     </div>
   );

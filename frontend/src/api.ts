@@ -174,6 +174,10 @@ export const statusLabels: Record<number, string> = {
   3: '下書き',
 };
 
+export function userRoleLabel(user: Pick<User, 'authority'>): string {
+  return user.authority === 'applicant' ? '一般ユーザ' : '管理ユーザ';
+}
+
 export function departmentAndStore(user: User | null | undefined): string {
   return [user?.department?.name, user?.store?.name].filter(Boolean).join(' / ') || '所属未設定';
 }

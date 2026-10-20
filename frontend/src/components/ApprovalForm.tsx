@@ -79,7 +79,7 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
 
   if (loadingMasters) return <div className="loading-state">初期データを読み込んでいます</div>;
   if (!currentUser || currentUser.authority !== 'applicant') {
-    return <div className="error-banner" role="alert">起案者ユーザーに切り替えてください。</div>;
+    return <div className="error-banner" role="alert">一般ユーザに切り替えてください。</div>;
   }
 
   return (
@@ -108,7 +108,7 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
               <select className="field-control" value={assigneeId} onChange={(event) => setAssigneeId(Number(event.target.value))}>
                 <option value={0}>未定・外部</option>
                 {masters?.users.filter((user) => user.authority === 'approver' || user.authority === 'admin').map((user) => (
-                  <option key={user.id} value={user.id}>{user.name} / {user.position ?? user.department?.name ?? '承認者'}</option>
+                  <option key={user.id} value={user.id}>{user.name} / {user.position ?? user.department?.name ?? '管理ユーザ'}</option>
                 ))}
               </select>
             </label>

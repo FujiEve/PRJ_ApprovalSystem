@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { departmentAndStore } from '@/api';
+import { departmentAndStore, userRoleLabel } from '@/api';
 import { WorkspaceProvider, useWorkspace } from './WorkspaceContext';
 
 function ShellContent({ children }: { children: React.ReactNode }) {
@@ -27,7 +27,7 @@ function ShellContent({ children }: { children: React.ReactNode }) {
               disabled={!masters?.users.length}
             >
               {masters?.users.map((user) => (
-                <option key={user.id} value={user.id}>{user.name} / {user.authority === 'applicant' ? '起案者' : user.authority === 'admin' ? '管理者' : '承認者'}</option>
+                <option key={user.id} value={user.id}>{user.name} / {userRoleLabel(user)}</option>
               ))}
             </select>
           </label>

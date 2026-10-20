@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, departmentAndStore, formatCurrency, statusLabels } from '@/api';
+import { api, departmentAndStore, formatCurrency, statusLabels, userRoleLabel } from '@/api';
 
 function mockJsonResponse(payload: unknown, ok = true, status = 200) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -65,5 +65,11 @@ describe('approval API client', () => {
     } as never)).toBe('営業部 / 渋谷店');
     expect(departmentAndStore(null)).toBe('所属未設定');
     expect(formatCurrency(1250)).toContain('1,250');
+  });
+
+  it('uses the requested labels for operation-user roles', () => {
+    expect(userRoleLabel({ authority: 'applicant' })).toBe('一般ユーザ');
+    expect(userRoleLabel({ authority: 'approver' })).toBe('管理ユーザ');
+    expect(userRoleLabel({ authority: 'admin' })).toBe('管理ユーザ');
   });
 });
