@@ -1,6 +1,7 @@
 # Agent & Local Env
 # Agent & Local Env
 .agent/
+.vscode/
 .env
 .env*.local
 .DS_Store

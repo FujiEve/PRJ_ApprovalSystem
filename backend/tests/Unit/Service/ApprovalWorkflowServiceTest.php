@@ -530,7 +530,7 @@ class ApprovalWorkflowServiceTest extends TestCase
         $service = new ApprovalWorkflowService($repository, $this->createMock(MasterRepository::class));
 
         try {
-            $service->updateCommentStatus(10, 20, 99);
+            $service->updateCommentStatus(10, 20, 99, 1);
             $this->fail('Expected a validation exception.');
         } catch (HttpException $exception) {
             $this->assertSame(422, $exception->getStatusCode());
@@ -562,29 +562,28 @@ class ApprovalWorkflowServiceTest extends TestCase
         $this->assertSame($comment, $this->service($repository)->addComment(70, 2, ' Question '));
     }
 
-    public function test_comment_status_rejects_missing_comment_and_updates_each_valid_status(): void
+    public function test_comment_status_rejects_missing_comment_and_updates_unread_to_read(): void
     {
         $missingRepository = $this->createMock(ApprovalRepository::class);
         $missingRepository->expects($this->once())->method('findCommentById')->with(70, 80)->willReturn(null);
         $this->assertHttpException(404, fn () =>
-            $this->service($missingRepository)->updateCommentStatus(70, 80, ApprovalComment::STATUS_READ)
+            $this->service($missingRepository)->updateCommentStatus(70, 80, ApprovalComment::STATUS_READ, 1)
         );
 
-        foreach ([
-            ApprovalComment::STATUS_UNREAD,
-            ApprovalComment::STATUS_READ,
-            ApprovalComment::STATUS_RESOLVED,
-        ] as $status) {
-            $comment = new ApprovalComment();
-            $repository = $this->createMock(ApprovalRepository::class);
-            $repository->expects($this->once())->method('findCommentById')->with(70, 80)->willReturn($comment);
-            $repository->expects($this->once())
-                ->method('updateCommentStatus')
-                ->with($comment, $status)
-                ->willReturn($comment);
+        $approval = $this->approval(ApprovalStatusMaster::STATUS_PENDING, 1);
+        $comment = new ApprovalComment(['status' => ApprovalComment::STATUS_UNREAD]);
+        $repository = $this->createMock(ApprovalRepository::class);
+        $repository->expects($this->once())->method('findCommentById')->with(70, 80)->willReturn($comment);
+        $repository->expects($this->once())->method('findById')->with(70)->willReturn($approval);
+        $repository->expects($this->once())
+            ->method('updateCommentStatus')
+            ->with($comment, ApprovalComment::STATUS_READ)
+            ->willReturn($comment);
 
-            $this->assertSame($comment, $this->service($repository)->updateCommentStatus(70, 80, $status));
-        }
+        $this->assertSame(
+            $comment,
+            $this->service($repository)->updateCommentStatus(70, 80, ApprovalComment::STATUS_READ, 1),
+        );
     }
 
     private function assertUpdateRejected(?Approval $approval, array $data, ?int $actorUserId, int $statusCode): void

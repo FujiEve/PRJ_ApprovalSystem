@@ -209,21 +209,38 @@ class ApprovalWorkflowTest extends TestCase
         $this->postJson('/api/approvals/1/withdraw', ['user_id' => 2])->assertForbidden();
     }
 
-    public function test_comment_status_can_be_updated_and_invalid_values_are_rejected(): void
+    public function test_only_applicant_can_advance_comment_status_in_order(): void
     {
         $comment = $this->postJson('/api/approvals/1/comments', [
             'user_id' => 1,
             'content' => '確認コメント',
         ])->assertCreated()->json('data');
 
-        $this->patchJson("/api/approvals/1/comments/{$comment['id']}/status", ['status' => 2])
+        $commentStatusUrl = "/api/approvals/1/comments/{$comment['id']}/status";
+
+        $this->patchJson($commentStatusUrl, ['user_id' => 3, 'status' => 1])
+            ->assertForbidden();
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 2])
+            ->assertUnprocessable();
+
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.status', 1);
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 0])
+            ->assertUnprocessable();
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 1])
+            ->assertUnprocessable();
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 2])
             ->assertOk()
             ->assertJsonPath('data.status', 2);
-
-        $this->patchJson("/api/approvals/1/comments/{$comment['id']}/status", ['status' => 9])
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 1])
             ->assertUnprocessable();
-        $this->patchJson('/api/approvals/1/comments/99999/status', ['status' => 1])
+
+        $this->patchJson($commentStatusUrl, ['user_id' => 1, 'status' => 9])
+            ->assertUnprocessable();
+        $this->patchJson('/api/approvals/1/comments/99999/status', ['user_id' => 1, 'status' => 1])
             ->assertNotFound();
+        $this->patchJson($commentStatusUrl, ['status' => 1])->assertUnprocessable();
         $this->postJson('/api/approvals/1/comments', ['user_id' => 1, 'content' => '   '])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['content']);

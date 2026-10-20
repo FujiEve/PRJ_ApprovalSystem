@@ -317,13 +317,9 @@ class ApprovalWorkflowService
     /**
      * コメントの既読・対応ステータス更新 (0:未読 / 1:既読 / 2:対応済み)
      */
-    public function updateCommentStatus(int $approvalId, int $commentId, int $status): ApprovalComment
+    public function updateCommentStatus(int $approvalId, int $commentId, int $status, int $actorUserId): ApprovalComment
     {
-        if (!in_array($status, [
-            ApprovalComment::STATUS_UNREAD,
-            ApprovalComment::STATUS_READ,
-            ApprovalComment::STATUS_RESOLVED,
-        ], true)) {
+        if (!in_array($status, [ApprovalComment::STATUS_READ, ApprovalComment::STATUS_RESOLVED], true)) {
             throw new HttpException(422, '不正なコメントステータスです。');
         }
 
@@ -331,6 +327,25 @@ class ApprovalWorkflowService
 
         if (!$comment) {
             throw new HttpException(404, '指定されたコメントが見つかりません。');
+        }
+
+        $approval = $this->approvalRepository->findById($approvalId);
+        if (!$approval) {
+            throw new HttpException(404, '指定された稟議が見つかりません。');
+        }
+
+        if ($approval->applicant_user_id !== $actorUserId) {
+            throw new HttpException(403, 'コメント状態を変更できるのは起案者本人のみです。');
+        }
+
+        $allowedNextStatus = match ($comment->status) {
+            ApprovalComment::STATUS_UNREAD => ApprovalComment::STATUS_READ,
+            ApprovalComment::STATUS_READ => ApprovalComment::STATUS_RESOLVED,
+            default => null,
+        };
+
+        if ($status !== $allowedNextStatus) {
+            throw new HttpException(422, 'コメント状態は未読から既読、既読から対応済みの順にのみ変更できます。');
         }
 
         return $this->approvalRepository->updateCommentStatus($comment, $status);

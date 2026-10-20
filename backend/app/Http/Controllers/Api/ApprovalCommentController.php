@@ -41,9 +41,21 @@ class ApprovalCommentController extends Controller
      */
     public function updateStatus(Request $request, int $id, int $commentId): JsonResponse
     {
-        $status = (int) $request->input('status', 0);
+        $validated = $request->validate([
+            'status' => ['required', 'integer', 'in:1,2'],
+        ]);
+        $actorUserId = $request->input('user_id', $request->header('X-Current-User-Id'));
 
-        $comment = $this->workflowService->updateCommentStatus($id, $commentId, $status);
+        if (!is_numeric($actorUserId) || (int) $actorUserId < 1) {
+            return response()->json(['message' => '操作ユーザIDは必須です。'], 422);
+        }
+
+        $comment = $this->workflowService->updateCommentStatus(
+            $id,
+            $commentId,
+            (int) $validated['status'],
+            (int) $actorUserId
+        );
 
         return response()->json([
             'message' => 'コメントのステータスを更新しました。',

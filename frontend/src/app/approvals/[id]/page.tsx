@@ -167,12 +167,13 @@ export default function ApprovalDetailPage() {
                     <p>{comment.content}</p>
                     <div className="comment-status-row">
                       <span className={`comment-state comment-state-${comment.status}`}>{commentStatuses[comment.status] ?? '未読'}</span>
-                      <label>
-                        <span className="sr-only">コメント対応状態</span>
-                        <select value={comment.status} disabled={busy} onChange={(event) => void changeCommentStatus(comment.id, Number(event.target.value))}>
-                          {commentStatuses.map((label, index) => <option key={label} value={index}>{label}にする</option>)}
+                      {isApplicant && <label>
+                        <span className="sr-only">コメント状態を進める</span>
+                        <select value={comment.status} disabled={busy || comment.status === 2} onChange={(event) => void changeCommentStatus(comment.id, Number(event.target.value))}>
+                          <option value={comment.status}>{commentStatuses[comment.status]}（現在）</option>
+                          {comment.status < 2 && <option value={comment.status + 1}>{commentStatuses[comment.status + 1]}にする</option>}
                         </select>
-                      </label>
+                      </label>}
                     </div>
                   </div>
                 </article>

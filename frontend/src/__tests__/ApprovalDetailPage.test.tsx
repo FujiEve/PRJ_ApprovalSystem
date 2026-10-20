@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Approval, User } from '@/api';
+import type { Approval, ApprovalComment, User } from '@/api';
 import ApprovalDetailPage from '@/app/approvals/[id]/page';
 
 const mocks = vi.hoisted(() => ({
@@ -64,6 +64,15 @@ const approver: User = {
   authority: 'approver',
 };
 
+const discussionComment: ApprovalComment = {
+  id: 51,
+  user_id: 3,
+  content: '見積内容を確認してください。',
+  status: 0,
+  created_at: '2026-10-01T01:00:00.000000Z',
+  user: approver,
+};
+
 const pendingApproval: Approval = {
   id: 21,
   applicant_user_id: 1,
@@ -79,7 +88,7 @@ const pendingApproval: Approval = {
   applicant,
   assignee: approver,
   status: { id: 0, name: '申請中' },
-  comments: [],
+  comments: [discussionComment],
   histories: [],
   files: [],
 };
@@ -99,6 +108,7 @@ describe('ApprovalDetailPage', () => {
     render(<ApprovalDetailPage />);
 
     expect(await screen.findByRole('heading', { name: '承認判断' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('コメント状態を進める')).not.toBeInTheDocument();
     const remandButton = screen.getByRole('button', { name: '差し戻す' });
     expect(remandButton).toBeDisabled();
     expect(screen.getByRole('button', { name: '承認する' })).toBeEnabled();
@@ -120,5 +130,41 @@ describe('ApprovalDetailPage', () => {
     await user.click(screen.getByRole('button', { name: '申請を取り下げる' }));
 
     await waitFor(() => expect(mocks.withdraw).toHaveBeenCalledWith(1, 21));
+  });
+
+  it('allows the applicant to move an unread comment only to read', async () => {
+    mocks.workspace = { currentUserId: 1, currentUser: applicant };
+    const user = userEvent.setup();
+    render(<ApprovalDetailPage />);
+
+    const statusSelect = await screen.findByLabelText('コメント状態を進める');
+    expect(screen.getAllByRole('option', { name: '未読（現在）' })).toHaveLength(1);
+    expect(screen.getByRole('option', { name: '既読にする' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '対応済みにする' })).not.toBeInTheDocument();
+
+    await user.selectOptions(statusSelect, '1');
+
+    await waitFor(() => expect(mocks.updateCommentStatus).toHaveBeenCalledWith(1, 21, 51, 1));
+  });
+
+  it('allows the applicant to move a read comment only to resolved', async () => {
+    mocks.workspace = { currentUserId: 1, currentUser: applicant };
+    mocks.getApproval.mockResolvedValue({
+      data: {
+        ...pendingApproval,
+        comments: [{ ...discussionComment, status: 1 }],
+      },
+    });
+    const user = userEvent.setup();
+    render(<ApprovalDetailPage />);
+
+    const statusSelect = await screen.findByLabelText('コメント状態を進める');
+    expect(screen.getByRole('option', { name: '既読（現在）' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '対応済みにする' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '未読にする' })).not.toBeInTheDocument();
+
+    await user.selectOptions(statusSelect, '2');
+
+    await waitFor(() => expect(mocks.updateCommentStatus).toHaveBeenCalledWith(1, 21, 51, 2));
   });
 });
