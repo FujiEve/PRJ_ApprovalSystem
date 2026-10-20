@@ -82,11 +82,13 @@ describe('HomePage', () => {
     mocks.getApprovals.mockResolvedValue({ data: [approval] });
   });
 
-  it('requests only the applicant’s approvals and updates status filters', async () => {
+  it('shows the applicant tab and updates status filters', async () => {
     const user = userEvent.setup();
     render(<HomePage />);
 
+    expect(screen.getByRole('tab', { name: '自分の申請' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('link', { name: 'モニター購入の申請' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '承認担当者' })).toBeInTheDocument();
     await waitFor(() => expect(mocks.getApprovals).toHaveBeenCalledOnce());
     const initialQuery = mocks.getApprovals.mock.calls[0][1] as URLSearchParams;
     expect(mocks.getApprovals.mock.calls[0][0]).toBe(1);
@@ -104,11 +106,33 @@ describe('HomePage', () => {
     render(<HomePage />);
 
     expect(await screen.findByRole('heading', { name: '承認ワークベンチ' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '他人の承認' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('columnheader', { name: '起案者' })).toBeInTheDocument();
     await waitFor(() => expect(mocks.getApprovals).toHaveBeenCalledOnce());
     const query = mocks.getApprovals.mock.calls[0][1] as URLSearchParams;
     expect(mocks.getApprovals.mock.calls[0][0]).toBe(3);
     expect(query.get('assignee_user_id')).toBe('3');
     expect(query.has('applicant_user_id')).toBe(false);
     expect(screen.queryByRole('link', { name: '新規稟議' })).not.toBeInTheDocument();
+  });
+
+  it('switches between own applications and assigned approvals', async () => {
+    const user = userEvent.setup();
+    render(<HomePage />);
+
+    await screen.findByRole('link', { name: 'モニター購入の申請' });
+    await user.click(screen.getByRole('tab', { name: '他人の承認' }));
+
+    await waitFor(() => expect(mocks.getApprovals).toHaveBeenCalledTimes(2));
+    const reviewQuery = mocks.getApprovals.mock.calls[1][1] as URLSearchParams;
+    expect(reviewQuery.get('assignee_user_id')).toBe('1');
+    expect(reviewQuery.has('applicant_user_id')).toBe(false);
+    expect(screen.getByRole('tab', { name: '他人の承認' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('tab', { name: '自分の申請' }));
+    await waitFor(() => expect(mocks.getApprovals).toHaveBeenCalledTimes(3));
+    const ownQuery = mocks.getApprovals.mock.calls[2][1] as URLSearchParams;
+    expect(ownQuery.get('applicant_user_id')).toBe('1');
+    expect(ownQuery.has('assignee_user_id')).toBe(false);
   });
 });

@@ -154,6 +154,12 @@ button { color: inherit; }
 .overview-strip strong { font-size: 14px; font-variant-numeric: tabular-nums; }
 .overview-strip strong small { color: var(--ink-soft); font-size: 10px; font-weight: 400; }
 .overview-user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-view-tabs { display: flex; align-items: stretch; gap: 0; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.list-view-tab { position: relative; min-height: 44px; padding: 0 16px; color: var(--ink-soft); background: transparent; border: 0; cursor: pointer; font-size: 11px; }
+.list-view-tab::after { position: absolute; right: 12px; bottom: -1px; left: 12px; height: 2px; background: transparent; content: ""; }
+.list-view-tab:hover { color: var(--ink); }
+.list-view-tab.is-active { color: var(--forest-dark); font-weight: 700; }
+.list-view-tab.is-active::after { background: var(--forest); }
 .secondary-filters { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #fbfcf8; border-bottom: 1px solid var(--line); }
 .secondary-filters label { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 10px; }
 .secondary-filters select { min-width: 125px; height: 30px; padding: 0 28px 0 8px; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 2px; font-size: 10px; }
@@ -287,6 +293,8 @@ button { color: inherit; }
   .page-heading p { max-width: 55vw; }
   .toolbar { align-items: stretch; }
   .search-control { width: 100%; }
+  .list-view-tabs { padding: 0 8px; }
+  .list-view-tab { flex: 1; padding: 0 8px; }
   .form-layout, .detail-layout { grid-template-columns: 1fr; }
   .form-aside { display: none; }
   .detail-actions-column { grid-row: 1; }

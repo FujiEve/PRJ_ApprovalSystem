@@ -13,6 +13,11 @@ const statusFilters = [
   { id: '1', label: '承認済み' },
 ];
 
+const listViews = [
+  { id: 'mine', label: '自分の申請' },
+  { id: 'reviews', label: '他人の承認' },
+] as const;
+
 export default function HomePage() {
   const { currentUserId, currentUser, masters, loadingMasters } = useWorkspace();
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -20,9 +25,11 @@ export default function HomePage() {
   const [keyword, setKeyword] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [storeId, setStoreId] = useState('');
+  const [selectedView, setSelectedView] = useState<'mine' | 'reviews' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const isApprover = currentUser?.authority === 'approver' || currentUser?.authority === 'admin';
+  const activeView = selectedView ?? (isApprover ? 'reviews' : 'mine');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -31,8 +38,8 @@ export default function HomePage() {
     if (keyword.trim()) query.set('keyword', keyword.trim());
     if (departmentId) query.set('department_id', departmentId);
     if (storeId) query.set('store_id', storeId);
-    if (currentUser.authority === 'applicant') query.set('applicant_user_id', String(currentUserId));
-    if (isApprover && currentUser.authority !== 'admin') query.set('assignee_user_id', String(currentUserId));
+    if (activeView === 'mine') query.set('applicant_user_id', String(currentUserId));
+    if (activeView === 'reviews') query.set('assignee_user_id', String(currentUserId));
 
     let active = true;
     setLoading(true);
@@ -50,7 +57,7 @@ export default function HomePage() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [currentUser, currentUserId, departmentId, isApprover, keyword, status, storeId]);
+  }, [activeView, currentUser, currentUserId, departmentId, keyword, status, storeId]);
 
   const totalAmount = approvals.reduce((sum, approval) => sum + approval.amount, 0);
 
@@ -60,7 +67,7 @@ export default function HomePage() {
         <div>
           <span className="eyebrow">{isApprover ? 'REVIEW QUEUE' : 'MY REQUESTS'} / {new Date().getFullYear()}</span>
           <h1>{isApprover ? '承認ワークベンチ' : '稟議一覧'}</h1>
-          <p>{isApprover ? '担当案件の確認と意思決定' : '起案した申請の進行状況'}</p>
+          <p>{activeView === 'reviews' ? '自分が承認を担当する申請' : '自分が起案した申請の進行状況'}</p>
         </div>
         {!isApprover && <Link className="button button-primary" href="/approvals/new"><span aria-hidden="true">＋</span> 新規稟議</Link>}
       </div>
@@ -72,6 +79,19 @@ export default function HomePage() {
       </div>
 
       <section className="surface list-surface" aria-label="稟議リスト">
+        <div className="list-view-tabs" role="tablist" aria-label="申請の表示切替">
+          {listViews.map((view) => (
+            <button
+              className={`list-view-tab ${activeView === view.id ? 'is-active' : ''}`}
+              key={view.id}
+              onClick={() => setSelectedView(view.id)}
+              role="tab"
+              aria-selected={activeView === view.id}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
         <div className="toolbar">
           <div className="filter-tabs" role="tablist" aria-label="ステータス">
             {statusFilters.map((filter) => (
@@ -90,7 +110,7 @@ export default function HomePage() {
             className="search-control"
             type="search"
             aria-label="稟議を検索"
-            placeholder="件名・内容・担当者を検索"
+            placeholder="件名・内容・承認担当者を検索"
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
           />
@@ -111,7 +131,7 @@ export default function HomePage() {
               {masters?.stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
             </select>
           </label>
-          <span className="filter-note">{isApprover ? '担当者に設定された案件を表示' : '自分が起案した案件を表示'}</span>
+          <span className="filter-note">{activeView === 'reviews' ? '自分が承認を担当する案件を表示' : '自分が起案した案件を表示'}</span>
         </div>
 
         {error && <div className="error-banner" role="alert">{error}</div>}
@@ -131,7 +151,7 @@ export default function HomePage() {
                   <th>起案日</th>
                   <th>件名</th>
                   <th>部署 / 店舗</th>
-                  <th>{isApprover ? '起案者' : '担当者'}</th>
+                  <th>{activeView === 'reviews' ? '起案者' : '承認担当者'}</th>
                   <th className="amount-cell">申請額</th>
                   <th aria-label="詳細" />
                 </tr>
@@ -143,7 +163,7 @@ export default function HomePage() {
                     <td className="muted">{formatDate(approval.created_at)}</td>
                     <td><Link className="approval-subject" href={`/approvals/${approval.id}`}>{approval.subject}</Link></td>
                     <td className="muted">{departmentAndStore(approval.applicant)}</td>
-                    <td>{isApprover ? approval.applicant?.name : approval.assignee_name || approval.assignee?.name || '未定'}</td>
+                    <td>{activeView === 'reviews' ? approval.applicant?.name : approval.assignee_name || approval.assignee?.name || '未定'}</td>
                     <td className="amount-cell">{formatCurrency(approval.amount)}</td>
                     <td><Link className="row-arrow" href={`/approvals/${approval.id}`} aria-label={`${approval.subject}の詳細`}>↗</Link></td>
                   </tr>
@@ -152,7 +172,7 @@ export default function HomePage() {
             </table>
           </div>
         )}
-        <div className="table-footer"><span>{currentUser?.authority === 'admin' ? '管理ユーザ表示' : isApprover ? '管理ユーザの担当案件' : '一般ユーザの起案案件'}</span><span>{approvals.length} 件</span></div>
+        <div className="table-footer"><span>{activeView === 'reviews' ? '他人の承認' : '自分の申請'}</span><span>{approvals.length} 件</span></div>
       </section>
     </div>
   );
