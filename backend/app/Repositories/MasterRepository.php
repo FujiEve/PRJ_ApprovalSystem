@@ -6,20 +6,91 @@ use App\Models\ApprovalStatusMaster;
 use App\Models\Department;
 use App\Models\Store;
 use App\Models\User;
+use App\Repositories\Concerns\HydratesJoinedRows;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class MasterRepository
 {
+    use HydratesJoinedRows;
+
+    private const USER_COLUMNS = [
+        'id', 'department_id', 'store_id', 'name', 'email', 'position', 'authority',
+        'created_at', 'updated_at', 'is_deleted',
+    ];
+
+    private const DEPARTMENT_COLUMNS = ['id', 'name', 'created_at', 'updated_at', 'is_deleted'];
+
+    private const STORE_COLUMNS = [
+        'id', 'name', 'prefecture_id', 'postal_code', 'address_detail', 'created_at', 'updated_at', 'is_deleted',
+    ];
+
+    private const STATUS_COLUMNS = ['id', 'name', 'memo'];
+
     /**
-     * 操作対象・担当者選択用の有効ユーザ一覧（予約レコード id=0 を除く）を取得
+     * 画面初期表示用のマスタ一式を1回のクエリ(UNION ALL)で取得する。
+     * 操作対象・担当者選択用のユーザは有効なもの(予約レコード id=0 を除く)のみ。
      */
-    public function getActiveUsers(): Collection
+    public function getInitialMasters(): array
     {
-        return User::with(['department', 'store'])
-            ->where('is_deleted', false)
-            ->where('id', '>', 0)
-            ->orderBy('id', 'asc')
-            ->get();
+        $rows = DB::select(<<<'SQL'
+SELECT 'user' AS kind, id, name, CAST(NULL AS VARCHAR(255)) AS memo, CAST(NULL AS INTEGER) AS prefecture_id,
+       CAST(NULL AS VARCHAR(255)) AS postal_code, CAST(NULL AS VARCHAR(255)) AS address_detail,
+       department_id, store_id, email, "position" AS job_position, authority,
+       created_at, updated_at, is_deleted
+FROM users WHERE is_deleted = ? AND id > 0
+UNION ALL
+SELECT 'department', id, name, CAST(NULL AS VARCHAR(255)), CAST(NULL AS INTEGER),
+       CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)),
+       CAST(NULL AS BIGINT), CAST(NULL AS BIGINT), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)),
+       created_at, updated_at, is_deleted
+FROM departments
+UNION ALL
+SELECT 'store', id, name, CAST(NULL AS VARCHAR(255)), prefecture_id,
+       postal_code, address_detail,
+       CAST(NULL AS BIGINT), CAST(NULL AS BIGINT), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)),
+       created_at, updated_at, is_deleted
+FROM stores
+UNION ALL
+SELECT 'status', id, name, memo, CAST(NULL AS INTEGER),
+       CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)),
+       CAST(NULL AS BIGINT), CAST(NULL AS BIGINT), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)), CAST(NULL AS VARCHAR(255)),
+       CAST(NULL AS TIMESTAMP), CAST(NULL AS TIMESTAMP), CAST(NULL AS BOOLEAN)
+FROM approval_statuses_master
+ORDER BY 1, 2
+SQL, [false]);
+
+        $userRows = [];
+        $departments = [];
+        $stores = [];
+        $statuses = [];
+
+        foreach ($rows as $object) {
+            $row = (array) $object;
+            $row['position'] = $row['job_position'];
+
+            match ($row['kind']) {
+                'user' => $userRows[] = $row,
+                'department' => $departments[(int) $row['id']] = $this->hydrateFromRow(Department::class, $row, '', self::DEPARTMENT_COLUMNS),
+                'store' => $stores[(int) $row['id']] = $this->hydrateFromRow(Store::class, $row, '', self::STORE_COLUMNS),
+                'status' => $statuses[] = $this->hydrateFromRow(ApprovalStatusMaster::class, $row, '', self::STATUS_COLUMNS),
+            };
+        }
+
+        $users = array_map(function (array $row) use ($departments, $stores) {
+            $user = $this->hydrateFromRow(User::class, $row, '', self::USER_COLUMNS);
+            $user->setRelation('department', $departments[(int) $row['department_id']] ?? null);
+            $user->setRelation('store', $stores[(int) $row['store_id']] ?? null);
+
+            return $user;
+        }, $userRows);
+
+        return [
+            'users' => new Collection($users),
+            'departments' => (new Collection($departments))->where('is_deleted', false)->values(),
+            'stores' => (new Collection($stores))->where('is_deleted', false)->values(),
+            'statuses' => new Collection($statuses),
+        ];
     }
 
     /**
@@ -31,33 +102,4 @@ class MasterRepository
             ->where('is_deleted', false)
             ->first();
     }
-
-    /**
-     * 有効な部署マスタ一覧を取得
-     */
-    public function getActiveDepartments(): Collection
-    {
-        return Department::where('is_deleted', false)
-            ->orderBy('id', 'asc')
-            ->get();
-    }
-
-    /**
-     * 有効な店舗マスタ一覧を取得
-     */
-    public function getActiveStores(): Collection
-    {
-        return Store::where('is_deleted', false)
-            ->orderBy('id', 'asc')
-            ->get();
-    }
-
-    /**
-     * 稟議ステータスマスタ一覧を取得
-     */
-    public function getAllStatuses(): Collection
-    {
-        return ApprovalStatusMaster::orderBy('id', 'asc')->get();
-    }
 }
-

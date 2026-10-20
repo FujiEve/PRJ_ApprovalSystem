@@ -7,7 +7,9 @@ use App\Http\Requests\StoreApprovalRequest;
 use App\Http\Requests\UpdateApprovalRequest;
 use App\Models\ApprovalStatusMaster;
 use App\Services\ApprovalWorkflowService;
+use App\Http\Resources\ApprovalListResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -22,7 +24,7 @@ class ApprovalController extends Controller
      * GET /api/approvals
      * 稟議一覧取得（フィルタ・検索・下書き閲覧制御対応）
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): AnonymousResourceCollection
     {
         $currentUserId = $this->resolveCurrentUserId($request);
         $filters = $request->only([
@@ -36,9 +38,7 @@ class ApprovalController extends Controller
 
         $approvals = $this->workflowService->listApprovals($filters, $currentUserId);
 
-        return response()->json([
-            'data' => $approvals,
-        ]);
+        return ApprovalListResource::collection($approvals);
     }
 
     /**

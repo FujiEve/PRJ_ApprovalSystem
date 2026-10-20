@@ -29,6 +29,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     window.localStorage.setItem('approval-current-user-id', String(currentUserId));
+  }, [currentUserId]);
+
+  // マスタは操作ユーザに依存しないため、初回マウント時に1回だけ取得する
+  useEffect(() => {
     let active = true;
     setLoadingMasters(true);
     api.getMasters(currentUserId)
@@ -50,7 +54,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [currentUserId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentUser = masters?.users.find((user) => user.id === currentUserId) ?? null;
 

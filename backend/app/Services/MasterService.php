@@ -16,12 +16,7 @@ class MasterService
      */
     public function getInitialMasters(): array
     {
-        return [
-            'users' => $this->masterRepository->getActiveUsers(),
-            'departments' => $this->masterRepository->getActiveDepartments(),
-            'stores' => $this->masterRepository->getActiveStores(),
-            'statuses' => $this->masterRepository->getAllStatuses(),
-        ];
+        return $this->masterRepository->getInitialMasters();
     }
 }
 
