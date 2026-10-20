@@ -1,15 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:8080';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
-      },
-    ];
-  },
-};
+// /api/* のバックエンドへのプロキシは src/middleware.ts で行う(共有シークレット付与のため)。
+const nextConfig = {};
 
 export default nextConfig;
 

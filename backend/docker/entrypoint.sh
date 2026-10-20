@@ -19,6 +19,7 @@ fi
 if [ -f /var/www/html/vendor/autoload.php ]; then
     php artisan config:clear || true
     php artisan route:clear || true
+    
     php artisan migrate --force || true
     php artisan db:seed --force || true
 fi

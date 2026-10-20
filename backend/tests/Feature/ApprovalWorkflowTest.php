@@ -221,6 +221,19 @@ class ApprovalWorkflowTest extends TestCase
         $this->get('/api/no-such-route', ['Accept' => 'application/json'])->assertNotFound();
     }
 
+    public function test_api_requires_proxy_secret_when_configured(): void
+    {
+        putenv('API_PROXY_SECRET=s3cret');
+        try {
+            $this->getJson('/api/masters')->assertForbidden();
+            $this->getJson('/api/masters', ['X-Proxy-Secret' => 'wrong'])->assertForbidden();
+            $this->getJson('/api/masters', ['X-Proxy-Secret' => 's3cret'])->assertOk();
+            $this->getJson('/api/health')->assertOk();
+        } finally {
+            putenv('API_PROXY_SECRET');
+        }
+    }
+
     public function test_applicant_cannot_be_the_approval_assignee(): void
     {
         $this->postJson('/api/approvals', [

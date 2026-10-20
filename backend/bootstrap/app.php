@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api(prepend: [
             \App\Http\Middleware\CorsMiddleware::class,
+            \App\Http\Middleware\ProxySecretMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
