@@ -209,6 +209,18 @@ class ApprovalWorkflowTest extends TestCase
         $this->getJson('/api/approvals/99999')->assertNotFound();
     }
 
+    public function test_unknown_non_api_url_returns_html_404_page(): void
+    {
+        $this->get('/')->assertNotFound()->assertSee('ページが見つかりません', false);
+        $this->get('/no/such/page')->assertNotFound()->assertSee('404', false);
+    }
+
+    public function test_unknown_api_url_still_returns_json_404(): void
+    {
+        $this->getJson('/api/no-such-route')->assertNotFound()->assertJsonStructure(['message']);
+        $this->get('/api/no-such-route', ['Accept' => 'application/json'])->assertNotFound();
+    }
+
     public function test_applicant_cannot_be_the_approval_assignee(): void
     {
         $this->postJson('/api/approvals', [
