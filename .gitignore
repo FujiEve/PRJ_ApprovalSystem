@@ -22,6 +22,7 @@ vendor/
 /database/postgres/
 backend/storage/*.key
 backend/storage/app/private/approvals/
+backend/storage/framework/cache/data/
 backend/storage/framework/testing/
 backend/storage/logs/*.log
 backend/bootstrap/cache/*.php

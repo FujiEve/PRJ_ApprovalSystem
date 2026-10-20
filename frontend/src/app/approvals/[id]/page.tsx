@@ -28,6 +28,15 @@ export default function ApprovalDetailPage() {
   const [newComment, setNewComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [previewFileId, setPreviewFileId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (previewFileId === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewFileId(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [previewFileId]);
   useEffect(() => {
     if (!currentUser) return;
     let active = true;
@@ -154,19 +163,22 @@ export default function ApprovalDetailPage() {
                       <li key={file.id}>
                         <a href={stored ? approvalFileUrl(approval.id, file.id, currentUserId) : file.file_url} target="_blank" rel="noreferrer">{file.file_name}<span aria-hidden="true"> ↗</span></a>
                         {kind && (
-                          <button type="button" className="preview-toggle" onClick={() => setPreviewFileId(previewFileId === file.id ? null : file.id)}>
-                            {previewFileId === file.id ? 'プレビューを閉じる' : 'プレビュー'}
+                          <button type="button" className="preview-toggle" onClick={() => setPreviewFileId(file.id)}>
+                            プレビュー
                           </button>
                         )}
                       </li>
                     );
                   })}</ul>
                   {approval.files.filter((file) => file.id === previewFileId).map((file) => (
-                    <div className="attachment-preview" key={file.id}>
-                      {filePreviewKind(file.file_name) === 'image'
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={approvalFileUrl(approval.id, file.id, currentUserId, true)} alt={file.file_name} />
-                        : <iframe src={approvalFileUrl(approval.id, file.id, currentUserId, true)} title={file.file_name} />}
+                    <div className="preview-overlay" key={file.id} role="dialog" aria-modal="true" aria-label={`${file.file_name}のプレビュー`} onClick={() => setPreviewFileId(null)}>
+                      <div className="attachment-preview" onClick={(event) => event.stopPropagation()}>
+                        <header><strong>{file.file_name}</strong><button type="button" onClick={() => setPreviewFileId(null)} aria-label="プレビューを閉じる">閉じる ✕</button></header>
+                        {filePreviewKind(file.file_name) === 'image'
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={approvalFileUrl(approval.id, file.id, currentUserId, true)} alt={file.file_name} />
+                          : <iframe src={approvalFileUrl(approval.id, file.id, currentUserId, true)} title={file.file_name} />}
+                      </div>
                     </div>
                   ))}
                 </>
