@@ -12,7 +12,7 @@
 | **Webサーバ** | **Nginx** | **Render.com** (Docker) | ・リバースプロキシおよびLaravel (PHP-FPM) へのFastCGI通信<br>・静的ファイル配信、セキュリティヘッダ制御 |
 | **バックエンド** | **Laravel** (PHP 8.x / APIモード) | **Render.com** (Docker) | ・堅牢なルーティング、FormRequestによるバリデーション<br>・Eloquent ORMによるリレーション管理とトランザクション制御 |
 | **データベース** | **PostgreSQL** | **Supabase** | ・厳格な型制約・外部キー制約と高いトランザクション整合性<br>・SupabaseのマネージドPostgreSQL（および必要に応じたSupabase Storage連携） |
-| **ローカル開発環境** | **Docker Compose** | ローカルマシン | ・`Next.js` / `Nginx` / `PHP-FPM (Laravel)` / `PostgreSQL` のローカル完全再現 |
+| **ローカル開発環境** | **Docker Compose** | ローカルマシン | ・`Next.js` / `Nginx` / `PHP-FPM (Laravel)` / `PostgreSQL` のローカル完全再現<br>・PostgreSQLのデータディレクトリを`./database/postgres`へバインドし、ホスト上のファイルとして保持 |
 
 ---
 
@@ -71,6 +71,8 @@ PRJ_ApprovalSystem/
 ├── docker-compose.yml          # ローカル開発用 (frontend, backend, db)
 ├── render.yaml                 # Render.com デプロイ定義 (rootDir: backend)
 ├── .env                        # 環境変数設定ファイル (Git管理外)
+├── database/
+│   └── postgres/               # PostgreSQLデータディレクトリ (Git管理外・Composeでバインド)
 │
 ├── docs/                       # 設計ドキュメント群
 │   ├── spec.md                 # 要件定義・仕様書
@@ -121,6 +123,12 @@ PRJ_ApprovalSystem/
 ```
 
 ---
+
+### ローカルPostgreSQLデータの永続化
+
+Docker ComposeのPostgreSQLは`./database/postgres`を`/var/lib/postgresql/data`へバインドします。DBコンテナを再作成してもホスト側にデータが残ります。このディレクトリは`.gitignore`対象です。
+
+ファイル同期サービスを使う場合、PostgreSQL稼働中のデータディレクトリを同期・複製すると不整合や破損の原因になります。同期前にDBコンテナを停止し、同じデータディレクトリを複数端末で同時に起動しないでください。
 
 ## 5. アプリケーション層・責務設計
 

@@ -19,6 +19,7 @@ yarn-error.log*
 
 # Backend (Laravel / PHP)
 vendor/
+/database/postgres/
 backend/storage/*.key
 backend/storage/app/private/approvals/
 backend/storage/framework/testing/
