@@ -22,6 +22,8 @@ if [ -f /var/www/html/vendor/autoload.php ]; then
     
     php artisan migrate --force || true
     php artisan db:seed --force || true
+    # シーダーでマスタが更新されるため、キャッシュを破棄する
+    php artisan cache:clear || true
 fi
 
 exec /usr/bin/supervisord -c /etc/supervisord.conf

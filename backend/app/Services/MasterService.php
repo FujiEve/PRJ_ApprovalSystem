@@ -3,9 +3,15 @@
 namespace App\Services;
 
 use App\Repositories\MasterRepository;
+use Illuminate\Support\Facades\Cache;
 
 class MasterService
 {
+    public const CACHE_KEY = 'masters.initial';
+
+    // マスタは更新APIが無くほぼ変化しないため、DB往復を省くよう短時間キャッシュする
+    public const CACHE_TTL_SECONDS = 600;
+
     public function __construct(
         private readonly MasterRepository $masterRepository
     ) {
@@ -16,7 +22,11 @@ class MasterService
      */
     public function getInitialMasters(): array
     {
-        return $this->masterRepository->getInitialMasters();
+        return Cache::remember(
+            self::CACHE_KEY,
+            self::CACHE_TTL_SECONDS,
+            fn () => $this->masterRepository->getInitialMasters()
+        );
     }
 }
 

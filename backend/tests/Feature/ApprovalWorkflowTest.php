@@ -36,6 +36,19 @@ class ApprovalWorkflowTest extends TestCase
         $this->assertGreaterThanOrEqual(4, count($response->json('users')));
     }
 
+    public function test_masters_are_cached_between_requests(): void
+    {
+        $this->getJson('/api/masters')->assertOk();
+
+        $queries = 0;
+        \Illuminate\Support\Facades\DB::listen(function () use (&$queries) {
+            $queries++;
+        });
+
+        $this->getJson('/api/masters')->assertOk()->assertJsonStructure(['users', 'departments', 'stores', 'statuses']);
+        $this->assertSame(0, $queries);
+    }
+
     public function test_full_workflow_from_draft_to_remand_and_approval(): void
     {
         // 1. 起案者(user_id=1)が下書き保存 (status_id=3)
