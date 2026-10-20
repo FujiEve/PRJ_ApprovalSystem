@@ -29,20 +29,24 @@ class ApprovalWorkflowServiceTest extends TestCase
     public function test_detail_handles_missing_and_all_viewer_paths(): void
     {
         $repository = $this->createMock(ApprovalRepository::class);
-        $repository->expects($this->exactly(5))->method('findDetailById')->willReturnOnConsecutiveCalls(
+        $assigneeApproval = $this->approval(ApprovalStatusMaster::STATUS_PENDING, 1);
+        $assigneeApproval->assignee_user_id = 3;
+        $repository->expects($this->exactly(6))->method('findDetailById')->willReturnOnConsecutiveCalls(
             null,
             $this->approval(ApprovalStatusMaster::STATUS_DRAFT, 1),
             $this->approval(ApprovalStatusMaster::STATUS_DRAFT, 1),
             $this->approval(ApprovalStatusMaster::STATUS_DRAFT, 1),
             $this->approval(ApprovalStatusMaster::STATUS_PENDING, 1),
+            $assigneeApproval,
         );
         $service = $this->service($repository);
 
         $this->assertHttpException(404, fn () => $service->getApprovalDetail(10));
+        $this->assertHttpException(403, fn () => $service->getApprovalDetail(10));
         $this->assertHttpException(403, fn () => $service->getApprovalDetail(10, 2));
         $this->assertSame(1, $service->getApprovalDetail(10, 1)->applicant_user_id);
-        $this->assertSame(1, $service->getApprovalDetail(10)->applicant_user_id);
-        $this->assertSame(ApprovalStatusMaster::STATUS_PENDING, $service->getApprovalDetail(10, 2)->status_id);
+        $this->assertHttpException(403, fn () => $service->getApprovalDetail(10, 2));
+        $this->assertSame(ApprovalStatusMaster::STATUS_PENDING, $service->getApprovalDetail(10, 3)->status_id);
     }
 
     public function test_create_pending_with_explicit_assignee_name_and_files(): void

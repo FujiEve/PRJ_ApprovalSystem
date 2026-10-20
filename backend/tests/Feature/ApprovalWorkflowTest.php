@@ -159,16 +159,40 @@ class ApprovalWorkflowTest extends TestCase
     public function test_list_filters_and_hides_drafts_from_other_users(): void
     {
         $response = $this->getJson('/api/approvals?status_id=2&department_id=1', [
-            'X-Current-User-Id' => '3',
+            'X-Current-User-Id' => '4',
         ]);
 
         $response->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', 2);
 
-        $this->getJson('/api/approvals?status_id=3', ['X-Current-User-Id' => '3'])
+        $this->getJson('/api/approvals?status_id=3', ['X-Current-User-Id' => '4'])
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    }
+
+    public function test_approval_details_are_visible_only_to_applicant_or_assignee(): void
+    {
+        $this->getJson('/api/approvals/1', ['X-Current-User-Id' => '1'])->assertOk();
+        $this->getJson('/api/approvals/1', ['X-Current-User-Id' => '3'])->assertOk();
+        $this->getJson('/api/approvals/1', ['X-Current-User-Id' => '2'])->assertForbidden();
+        $this->getJson('/api/approvals/1')->assertForbidden();
+
+        $this->getJson('/api/approvals/4', ['X-Current-User-Id' => '1'])->assertOk();
+        $this->getJson('/api/approvals/4', ['X-Current-User-Id' => '3'])->assertForbidden();
+    }
+
+    public function test_approval_list_contains_only_applications_involving_current_user(): void
+    {
+        $approverResponse = $this->getJson('/api/approvals', ['X-Current-User-Id' => '3']);
+        $approverResponse->assertOk()->assertJsonCount(2, 'data');
+        $this->assertEqualsCanonicalizing([1, 3], array_column($approverResponse->json('data'), 'id'));
+
+        $otherApplicantResponse = $this->getJson('/api/approvals', ['X-Current-User-Id' => '2']);
+        $otherApplicantResponse->assertOk()->assertJsonCount(1, 'data');
+        $this->assertSame(3, $otherApplicantResponse->json('data.0.id'));
+
+        $this->getJson('/api/approvals')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_create_and_show_validation_errors_are_returned(): void

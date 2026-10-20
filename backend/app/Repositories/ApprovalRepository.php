@@ -38,17 +38,22 @@ class ApprovalRepository
      */
     public function search(array $filters, ?int $currentUserId = null): Collection
     {
+        if ($currentUserId === null) {
+            return new Collection();
+        }
+
         $query = Approval::with(self::LIST_RELATIONS)
             ->withCount(['comments', 'files'])
             ->where('is_deleted', false);
 
-        // 下書き(status_id = 3)は起案者本人のみ閲覧可能
-        if ($currentUserId !== null) {
-            $query->where(function (Builder $q) use ($currentUserId) {
-                $q->where('status_id', '!=', ApprovalStatusMaster::STATUS_DRAFT)
-                    ->orWhere('applicant_user_id', $currentUserId);
+        // 起案者本人と、下書き以外の担当者だけが閲覧できる
+        $query->where(function (Builder $q) use ($currentUserId) {
+            $q->where('applicant_user_id', $currentUserId)
+                ->orWhere(function (Builder $assigneeQuery) use ($currentUserId) {
+                    $assigneeQuery->where('assignee_user_id', $currentUserId)
+                        ->where('status_id', '!=', ApprovalStatusMaster::STATUS_DRAFT);
+                });
             });
-        }
 
         if (isset($filters['status_id']) && $filters['status_id'] !== '') {
             $query->where('status_id', (int) $filters['status_id']);

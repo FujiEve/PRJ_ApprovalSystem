@@ -28,7 +28,7 @@ class ApprovalWorkflowService
     }
 
     /**
-     * 稟議詳細の取得（下書きの閲覧権限チェックを含む）
+     * 稟議詳細の取得（申請者本人または担当者の閲覧権限チェックを含む）
      */
     public function getApprovalDetail(int $approvalId, ?int $currentUserId = null): Approval
     {
@@ -38,12 +38,13 @@ class ApprovalWorkflowService
             throw new HttpException(404, '指定された稟議が見つかりません。');
         }
 
-        if (
-            $approval->status_id === ApprovalStatusMaster::STATUS_DRAFT &&
-            $currentUserId !== null &&
-            $approval->applicant_user_id !== $currentUserId
-        ) {
-            throw new HttpException(403, '下書き状態の稟議は起案者本人のみ閲覧可能です。');
+        $isApplicant = $currentUserId !== null && $approval->applicant_user_id === $currentUserId;
+        $isAssignedApprover = $currentUserId !== null
+            && $approval->status_id !== ApprovalStatusMaster::STATUS_DRAFT
+            && $approval->assignee_user_id === $currentUserId;
+
+        if (!$isApplicant && !$isAssignedApprover) {
+            throw new HttpException(403, '申請者本人または承認担当者のみ閲覧可能です。');
         }
 
         return $approval;
