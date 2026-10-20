@@ -26,7 +26,7 @@ jobs:
           extensions: pdo_sqlite, mbstring
           coverage: none
       - run: composer install --no-interaction --prefer-dist --no-progress
-      - run: php artisan test
+      - run: vendor/bin/phpunit
 
   deploy:
     needs: test
