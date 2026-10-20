@@ -89,7 +89,9 @@ export interface ApprovalInput {
   amount?: number;
   detail?: string;
   reason?: string;
-  files?: Array<{ file_name: string; file_url?: string }>;
+  files?: File[];
+  existing_file_ids?: number[];
+  sync_existing_files?: boolean;
 }
 
 export class ApiError extends Error {
@@ -107,7 +109,8 @@ async function request<T>(path: string, userId: number, init: RequestInit = {}):
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   headers.set('X-Current-User-Id', String(userId));
-  if (init.body && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -123,6 +126,26 @@ async function request<T>(path: string, userId: number, init: RequestInit = {}):
   return payload as T;
 }
 
+function approvalFormData(input: ApprovalInput, methodOverride?: string): FormData {
+  const formData = new FormData();
+
+  if (methodOverride) formData.append('_method', methodOverride);
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null) continue;
+    if (key === 'files' && Array.isArray(value)) {
+      for (const file of value) formData.append('files[]', file, file.name);
+    } else if (key === 'existing_file_ids' && Array.isArray(value)) {
+      for (const fileId of value) formData.append('existing_file_ids[]', String(fileId));
+    } else if (typeof value === 'boolean') {
+      formData.append(key, value ? '1' : '0');
+    } else {
+      formData.append(key, String(value));
+    }
+  }
+
+  return formData;
+}
+
 export const api = {
   getMasters: (userId: number) => request<Masters>('/masters', userId),
   getApprovals: (userId: number, query: URLSearchParams) =>
@@ -132,13 +155,14 @@ export const api = {
   createApproval: (userId: number, input: ApprovalInput) =>
     request<{ data: Approval; message: string }>('/approvals', userId, {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: approvalFormData(input),
     }),
   updateApproval: (userId: number, id: string, input: ApprovalInput) =>
     request<{ data: Approval; message: string }>(`/approvals/${id}`, userId, {
-      method: 'PUT',
-      body: JSON.stringify(input),
+      method: 'POST',
+      body: approvalFormData(input, 'PUT'),
     }),
+  approvalFileUrl: (approvalId: number, fileId: number) => `/api/approvals/${approvalId}/files/${fileId}`,
   withdraw: (userId: number, id: number) =>
     request<{ data: Approval; message: string }>(`/approvals/${id}/withdraw`, userId, {
       method: 'POST',
@@ -176,6 +200,10 @@ export const statusLabels: Record<number, string> = {
 
 export function userRoleLabel(user: Pick<User, 'authority'>): string {
   return user.authority === 'applicant' ? '一般ユーザ' : '管理ユーザ';
+}
+
+export function approvalFileUrl(approvalId: number, fileId: number, userId: number): string {
+  return `/api/approvals/${approvalId}/files/${fileId}?current_user_id=${userId}`;
 }
 
 export function departmentAndStore(user: User | null | undefined): string {

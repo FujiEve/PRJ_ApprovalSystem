@@ -19,6 +19,8 @@ Route::get('/masters', [MasterController::class, 'index']);
 Route::get('/approvals', [ApprovalController::class, 'index']);
 Route::post('/approvals', [ApprovalController::class, 'store']);
 Route::get('/approvals/{id}', [ApprovalController::class, 'show'])->whereNumber('id');
+Route::get('/approvals/{id}/files/{fileId}', [ApprovalController::class, 'downloadFile'])
+    ->whereNumber(['id', 'fileId']);
 Route::put('/approvals/{id}', [ApprovalController::class, 'update'])->whereNumber('id');
 
 Route::post('/approvals/{id}/withdraw', [ApprovalActionController::class, 'withdraw'])->whereNumber('id');

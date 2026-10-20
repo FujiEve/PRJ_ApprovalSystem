@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Models\Approval;
 use App\Models\ApprovalComment;
+use App\Models\ApprovalFile;
 use App\Models\ApprovalStatusMaster;
 use App\Repositories\ApprovalRepository;
 use App\Repositories\MasterRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Throwable;
 
 class ApprovalWorkflowService
 {
@@ -55,7 +58,10 @@ class ApprovalWorkflowService
      */
     public function createApproval(array $data): Approval
     {
-        return DB::transaction(function () use ($data) {
+        $storedPaths = [];
+
+        try {
+            return DB::transaction(function () use ($data, &$storedPaths) {
             $applicantId = (int) $data['applicant_user_id'];
             $assigneeId = (int) ($data['assignee_user_id'] ?? 0);
             $statusId = (int) ($data['status_id'] ?? ApprovalStatusMaster::STATUS_DRAFT);
@@ -75,7 +81,8 @@ class ApprovalWorkflowService
             ]);
 
             if (!empty($data['files']) && is_array($data['files'])) {
-                $this->approvalRepository->syncFiles($approval->id, $data['files']);
+                $syncResult = $this->approvalRepository->syncFiles($approval->id, $data['files']);
+                $storedPaths = $syncResult['stored_paths'];
             }
 
             $operationDetail = $statusId === ApprovalStatusMaster::STATUS_PENDING
@@ -85,7 +92,11 @@ class ApprovalWorkflowService
             $this->approvalRepository->createHistory($approval->id, $applicantId, $operationDetail);
 
             return $this->approvalRepository->loadDetailRelations($approval);
-        });
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($storedPaths);
+            throw $exception;
+        }
     }
 
     /**
@@ -93,7 +104,11 @@ class ApprovalWorkflowService
      */
     public function updateApproval(int $approvalId, array $data, ?int $actorUserId = null): Approval
     {
-        return DB::transaction(function () use ($approvalId, $data, $actorUserId) {
+        $storedPaths = [];
+        $deletedPaths = [];
+
+        try {
+            $approval = DB::transaction(function () use ($approvalId, $data, $actorUserId, &$storedPaths, &$deletedPaths) {
             $approval = $this->approvalRepository->findByIdForUpdate($approvalId);
 
             if (!$approval) {
@@ -140,8 +155,23 @@ class ApprovalWorkflowService
                 'reason' => (string) ($data['reason'] ?? ''),
             ]);
 
-            if (array_key_exists('files', $data) && is_array($data['files'])) {
-                $this->approvalRepository->syncFiles($approval->id, $data['files']);
+            if (
+                !empty($data['sync_existing_files'])
+                || (isset($data['files']) && is_array($data['files']))
+                || (isset($data['existing_file_ids']) && is_array($data['existing_file_ids']))
+            ) {
+                $uploads = isset($data['files']) && is_array($data['files']) ? $data['files'] : [];
+                $retainedFileIds = isset($data['existing_file_ids']) && is_array($data['existing_file_ids'])
+                    ? $data['existing_file_ids']
+                    : [];
+
+                if (count($uploads) + count($retainedFileIds) > 10) {
+                    throw new HttpException(422, '添付資料は合計10件までです。');
+                }
+
+                $syncResult = $this->approvalRepository->syncFiles($approval->id, $uploads, $retainedFileIds);
+                $storedPaths = $syncResult['stored_paths'];
+                $deletedPaths = $syncResult['deleted_paths'];
             }
 
             if ($previousStatus === ApprovalStatusMaster::STATUS_REMANDED && $nextStatus === ApprovalStatusMaster::STATUS_PENDING) {
@@ -159,7 +189,27 @@ class ApprovalWorkflowService
             );
 
             return $this->approvalRepository->loadDetailRelations($approval);
-        });
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($storedPaths);
+            throw $exception;
+        }
+
+        Storage::disk('local')->delete($deletedPaths);
+
+        return $approval;
+    }
+
+    public function getApprovalFile(int $approvalId, int $fileId, ?int $currentUserId): ApprovalFile
+    {
+        $this->getApprovalDetail($approvalId, $currentUserId);
+
+        $file = $this->approvalRepository->findFileById($approvalId, $fileId);
+        if (!$file || !Storage::disk('local')->exists($file->file_url)) {
+            throw new HttpException(404, '指定された添付資料が見つかりません。');
+        }
+
+        return $file;
     }
 
     /**

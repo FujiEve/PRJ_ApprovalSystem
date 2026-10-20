@@ -23,6 +23,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p /run/nginx storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chmod -R 777 storage bootstrap/cache \
     && chmod +x /entrypoint.sh \
+    && rm -f bootstrap/cache/packages.php bootstrap/cache/services.php \
     && if [ -f composer.json ]; then composer install --no-interaction --prefer-dist --optimize-autoloader; fi
 
 EXPOSE 80

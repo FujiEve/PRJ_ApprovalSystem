@@ -9,6 +9,7 @@ use App\Models\ApprovalStatusMaster;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ApprovalController extends Controller
 {
@@ -68,6 +69,18 @@ class ApprovalController extends Controller
         return response()->json([
             'data' => $approval,
         ]);
+    }
+
+    /**
+     * GET /api/approvals/{id}/files/{fileId}
+     * 関係者向け添付ファイルのダウンロード
+     */
+    public function downloadFile(Request $request, int $id, int $fileId)
+    {
+        $currentUserId = $this->resolveCurrentUserId($request);
+        $file = $this->workflowService->getApprovalFile($id, $fileId, $currentUserId);
+
+        return Storage::disk('local')->download($file->file_url, $file->file_name);
     }
 
     /**

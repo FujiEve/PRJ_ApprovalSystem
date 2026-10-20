@@ -8,6 +8,12 @@ docker compose up --build -d
 - フロントエンド: http://localhost:3000
 - フロントエンド経由のAPI: http://localhost:3000/api/health
 
+## 添付資料
+
+- PDF、JPEG、PNG、Word、Excelファイルをアップロードできます（1ファイル20MB以下、1稟議10ファイルまで）。
+- ファイルは`backend/storage/app/private/approvals/`に保存され、公開URLではなく閲覧権限を確認するAPI経由でダウンロードします。
+- 下書き・差し戻し案件の編集画面では、既存ファイルの削除と新規ファイルの追加を保存時に反映します。
+
 ## バックエンドテスト
 
 ```sh
@@ -34,6 +40,12 @@ npm test
 # ファイル変更を監視して実行
 npm run test:watch
 ```
+
+## 添付資料
+
+- PDF、JPEG、PNG、Word、Excelファイルをアップロードできます（1ファイル20MB以下、1稟議10ファイルまで）。
+- ファイル本体は`backend/storage/app/private/approvals/`に保存され、公開URLではなく権限付きAPI経由でダウンロードします。
+- 下書き・差し戻しの編集画面では、既存ファイルの削除と新規ファイル追加を保存時に反映します。
 
 ## Next.jsのローカル開発
 

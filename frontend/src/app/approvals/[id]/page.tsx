@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, departmentAndStore, formatCurrency, formatDate, statusLabels, type Approval } from '@/api';
+import { api, approvalFileUrl, departmentAndStore, formatCurrency, formatDate, statusLabels, type Approval } from '@/api';
 import { useWorkspace } from '@/components/WorkspaceContext';
 
 const commentStatuses = ['未読', '既読', '対応済み'];
@@ -146,7 +146,7 @@ export default function ApprovalDetailPage() {
             <div className="detail-attachments">
               <h2>添付資料 <span>{approval.files?.length ?? 0}</span></h2>
               {approval.files?.length ? (
-                <ul>{approval.files.map((file) => <li key={file.id}><a href={file.file_url} target="_blank" rel="noreferrer">{file.file_name}<span aria-hidden="true"> ↗</span></a></li>)}</ul>
+                <ul>{approval.files.map((file) => <li key={file.id}><a href={file.file_url.startsWith('approvals/') ? approvalFileUrl(approval.id, file.id, currentUserId) : file.file_url} target="_blank" rel="noreferrer">{file.file_name}<span aria-hidden="true"> ↗</span></a></li>)}</ul>
               ) : <p>添付資料はありません。</p>}
             </div>
           </section>

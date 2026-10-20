@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\Service;
 
 use App\Models\Approval;
 use App\Models\ApprovalComment;
@@ -11,6 +11,7 @@ use App\Repositories\ApprovalRepository;
 use App\Repositories\MasterRepository;
 use App\Services\ApprovalWorkflowService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
@@ -52,7 +53,7 @@ class ApprovalWorkflowServiceTest extends TestCase
     public function test_create_pending_with_explicit_assignee_name_and_files(): void
     {
         $approval = $this->approval(ApprovalStatusMaster::STATUS_PENDING, 1);
-        $files = [['file_name' => 'quote.pdf', 'file_url' => '/quote.pdf']];
+        $files = [UploadedFile::fake()->createWithContent('quote.pdf', '%PDF test')];
         $repository = $this->createMock(ApprovalRepository::class);
         $repository->expects($this->once())
             ->method('create')
@@ -63,7 +64,10 @@ class ApprovalWorkflowServiceTest extends TestCase
                 && $attributes['is_deleted'] === false
             ))
             ->willReturn($approval);
-        $repository->expects($this->once())->method('syncFiles')->with($approval->id, $files);
+        $repository->expects($this->once())
+            ->method('syncFiles')
+            ->with($approval->id, $files)
+            ->willReturn(['stored_paths' => [], 'deleted_paths' => []]);
         $repository->expects($this->once())
             ->method('createHistory')
             ->with($approval->id, 1, '稟議を新規申請しました')
@@ -237,7 +241,7 @@ class ApprovalWorkflowServiceTest extends TestCase
     {
         $approval = $this->approval(ApprovalStatusMaster::STATUS_REMANDED, 1);
         $approval->id = 31;
-        $files = [['file_name' => 'revised.pdf']];
+        $files = [UploadedFile::fake()->createWithContent('revised.pdf', '%PDF revised')];
         $repository = $this->createMock(ApprovalRepository::class);
         $repository->expects($this->once())->method('findByIdForUpdate')->with(31)->willReturn($approval);
         $repository->expects($this->once())->method('update')->with($approval, $this->callback(
@@ -245,7 +249,10 @@ class ApprovalWorkflowServiceTest extends TestCase
                 $attributes['status_id'] === ApprovalStatusMaster::STATUS_PENDING
                 && $attributes['assignee_name'] === 'Approver'
         ))->willReturn($approval);
-        $repository->expects($this->once())->method('syncFiles')->with(31, $files);
+        $repository->expects($this->once())
+            ->method('syncFiles')
+            ->with(31, $files, [])
+            ->willReturn(['stored_paths' => [], 'deleted_paths' => []]);
         $repository->expects($this->once())
             ->method('createHistory')
             ->with(31, 1, '差し戻し案件を修正し、再申請しました')
@@ -263,6 +270,7 @@ class ApprovalWorkflowServiceTest extends TestCase
             'assignee_user_id' => 8,
             'assignee_name' => ' ',
             'files' => $files,
+            'existing_file_ids' => [],
         ], 1));
     }
 

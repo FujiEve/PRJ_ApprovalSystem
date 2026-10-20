@@ -47,9 +47,8 @@ class StoreApprovalRequest extends FormRequest
             'reason' => $isApplying
                 ? ['required', 'string', 'regex:/\S/u']
                 : ['nullable', 'string'],
-            'files' => ['nullable', 'array'],
-            'files.*.file_name' => ['required_with:files', 'string', 'max:255'],
-            'files.*.file_url' => ['nullable', 'string', 'max:1024'],
+            'files' => ['sometimes', 'array', 'max:10'],
+            'files.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ];
     }
 

@@ -129,6 +129,22 @@ describe('ApprovalForm', () => {
     })));
   });
 
+  it('uploads a selected file with a new application', async () => {
+    const user = userEvent.setup();
+    const uploadedFile = new File(['pdf bytes'], 'estimate.pdf', { type: 'application/pdf' });
+    render(<ApprovalForm />);
+
+    await user.type(screen.getByLabelText(/件名/), '添付資料付き申請');
+    await user.upload(screen.getByLabelText(/ファイルを選択/), uploadedFile);
+    expect(screen.getByText('estimate.pdf')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '下書き保存' }));
+
+    await waitFor(() => expect(mocks.createApproval).toHaveBeenCalledWith(1, expect.objectContaining({
+      status_id: 3,
+      files: [uploadedFile],
+    })));
+  });
+
   it('blocks approver users from creating an application', () => {
     mocks.workspace = {
       ...mocks.workspace,
@@ -143,6 +159,8 @@ describe('ApprovalForm', () => {
   });
 
   it('updates an existing approval using the actor user id', async () => {
+    const retainedFile = { id: 71, file_name: 'keep.pdf', file_url: 'approvals/12/keep.pdf' };
+    const removedFile = { id: 72, file_name: 'remove.pdf', file_url: 'approvals/12/remove.pdf' };
     const initial = {
       id: 12,
       applicant_user_id: 1,
@@ -158,17 +176,25 @@ describe('ApprovalForm', () => {
       applicant,
       assignee: null,
       status: { id: 3, name: '下書き' },
-      files: [],
+      files: [retainedFile, removedFile],
     } satisfies Approval;
     const user = userEvent.setup();
     render(<ApprovalForm initial={initial} />);
 
+    expect(screen.getByText('keep.pdf')).toBeInTheDocument();
+    expect(screen.getByText('remove.pdf')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'remove.pdfを削除' }));
+    const uploadedFile = new File(['new pdf'], 'new.pdf', { type: 'application/pdf' });
+    await user.upload(screen.getByLabelText(/ファイルを選択/), uploadedFile);
     await user.click(screen.getByRole('button', { name: '下書き保存' }));
 
     await waitFor(() => expect(mocks.updateApproval).toHaveBeenCalledWith(1, '12', expect.objectContaining({
       user_id: 1,
       status_id: 3,
       subject: '下書き',
+      existing_file_ids: [71],
+      files: [uploadedFile],
+      sync_existing_files: true,
     })));
   });
 });

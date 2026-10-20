@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ApprovalWorkflowTest extends TestCase
@@ -205,6 +207,91 @@ class ApprovalWorkflowTest extends TestCase
             ->assertJsonValidationErrors(['amount', 'detail', 'reason']);
 
         $this->getJson('/api/approvals/99999')->assertNotFound();
+    }
+
+    public function test_create_approval_accepts_and_stores_uploaded_attachments(): void
+    {
+        Storage::fake('local');
+        $file = UploadedFile::fake()->createWithContent('estimate.pdf', "%PDF-1.4\nTest estimate");
+
+        $response = $this->post('/api/approvals', [
+            'applicant_user_id' => 1,
+            'assignee_user_id' => 3,
+            'status_id' => 0,
+            'subject' => '添付ファイル付きの申請',
+            'amount' => 1000,
+            'detail' => '添付ファイルのダウンロード確認',
+            'reason' => 'Featureテスト',
+            'files' => [$file],
+        ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()->assertJsonPath('data.files.0.file_name', 'estimate.pdf');
+        $storedPath = $response->json('data.files.0.file_url');
+        Storage::disk('local')->assertExists($storedPath);
+
+        $fileId = $response->json('data.files.0.id');
+        $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}", [
+            'X-Current-User-Id' => '1',
+        ])->assertOk();
+        $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}", [
+            'X-Current-User-Id' => '3',
+        ])->assertOk();
+        $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}", [
+            'X-Current-User-Id' => '2',
+        ])->assertForbidden();
+    }
+
+    public function test_edit_can_keep_delete_and_add_uploaded_attachments(): void
+    {
+        Storage::fake('local');
+        $keptUpload = UploadedFile::fake()->createWithContent('keep.pdf', "%PDF-1.4\nKeep");
+        $removedUpload = UploadedFile::fake()->createWithContent('remove.pdf', "%PDF-1.4\nRemove");
+        $createResponse = $this->post('/api/approvals', [
+            'applicant_user_id' => 1,
+            'assignee_user_id' => 3,
+            'status_id' => 3,
+            'subject' => '添付編集テスト',
+            'files' => [$keptUpload, $removedUpload],
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $approvalId = $createResponse->json('data.id');
+        $originalFiles = $createResponse->json('data.files');
+        $keptFile = collect($originalFiles)->firstWhere('file_name', 'keep.pdf');
+        $removedFile = collect($originalFiles)->firstWhere('file_name', 'remove.pdf');
+        $keptPath = $keptFile['file_url'];
+        $removedPath = $removedFile['file_url'];
+        $this->assertDatabaseHas('approval_files', [
+            'id' => $keptFile['id'],
+            'approval_id' => $approvalId,
+            'is_deleted' => false,
+        ]);
+        $newUpload = UploadedFile::fake()->createWithContent('new.pdf', "%PDF-1.4\nNew");
+
+        $updateResponse = $this->post("/api/approvals/{$approvalId}", [
+            '_method' => 'PUT',
+            'user_id' => 1,
+            'assignee_user_id' => 3,
+            'status_id' => 3,
+            'subject' => '添付編集テスト',
+            'existing_file_ids' => [$keptFile['id']],
+            'sync_existing_files' => '1',
+            'files' => [$newUpload],
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        $updatedFiles = $updateResponse->json('data.files');
+        $this->assertEqualsCanonicalizing(['keep.pdf', 'new.pdf'], array_column($updatedFiles, 'file_name'));
+        Storage::disk('local')->assertExists($keptPath);
+        Storage::disk('local')->assertMissing($removedPath);
+        Storage::disk('local')->assertExists(
+            collect($updatedFiles)->firstWhere('file_name', 'new.pdf')['file_url']
+        );
+
+        $this->getJson("/api/approvals/{$approvalId}/files/{$keptFile['id']}", [
+            'X-Current-User-Id' => '1',
+        ])->assertOk();
+        $this->getJson("/api/approvals/{$approvalId}/files/{$removedFile['id']}", [
+            'X-Current-User-Id' => '1',
+        ])->assertNotFound();
     }
 
     public function test_only_the_applicant_can_edit_a_remanded_approval(): void

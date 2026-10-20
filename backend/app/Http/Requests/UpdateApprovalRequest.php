@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ApprovalFile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,6 +27,10 @@ class UpdateApprovalRequest extends FormRequest
         if ($this->has('assignee_user_id') && ($this->input('assignee_user_id') === null || $this->input('assignee_user_id') === '')) {
             $this->merge(['assignee_user_id' => 0]);
         }
+
+        if ($this->boolean('sync_existing_files') && !array_key_exists('existing_file_ids', $this->all())) {
+            $this->merge(['existing_file_ids' => []]);
+        }
     }
 
     public function rules(): array
@@ -47,9 +52,24 @@ class UpdateApprovalRequest extends FormRequest
             'reason' => $isApplying
                 ? ['required', 'string', 'regex:/\S/u']
                 : ['nullable', 'string'],
-            'files' => ['nullable', 'array'],
-            'files.*.file_name' => ['required_with:files', 'string', 'max:255'],
-            'files.*.file_url' => ['nullable', 'string', 'max:1024'],
+            'files' => ['sometimes', 'array', 'max:10'],
+            'files.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'sync_existing_files' => ['sometimes', 'boolean'],
+            'existing_file_ids' => ['sometimes', 'array', 'max:10'],
+            'existing_file_ids.*' => [
+                'integer',
+                'distinct',
+                function ($attribute, $value, $fail): void {
+                    $exists = ApprovalFile::where('id', (int) $value)
+                        ->where('approval_id', (int) $this->route('id'))
+                        ->where('is_deleted', false)
+                        ->exists();
+
+                    if (!$exists) {
+                        $fail('この稟議に紐づく有効な添付資料を指定してください。');
+                    }
+                },
+            ],
         ];
     }
 

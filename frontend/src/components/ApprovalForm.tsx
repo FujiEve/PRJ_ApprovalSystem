@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, type Approval, type ApprovalInput } from '@/api';
+import { api, approvalFileUrl, type Approval, type ApprovalInput } from '@/api';
 import { useWorkspace } from './WorkspaceContext';
 
 interface ApprovalFormProps {
@@ -20,9 +20,8 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '');
   const [detail, setDetail] = useState(initial?.detail ?? '');
   const [reason, setReason] = useState(initial?.reason ?? '');
-  const [files, setFiles] = useState<Array<{ file_name: string; file_url: string }>>(
-    initial?.files?.map(({ file_name, file_url }) => ({ file_name, file_url })) ?? [],
-  );
+  const [existingFiles, setExistingFiles] = useState(initial?.files ?? []);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -53,7 +52,11 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
       amount: amount ? Number(amount) : 0,
       detail,
       reason,
-      files,
+      files: newFiles,
+      ...(isEditing ? {
+        existing_file_ids: existingFiles.map((file) => file.id),
+        sync_existing_files: true,
+      } : {}),
     };
 
     setSaving(true);
@@ -70,11 +73,26 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
     }
   }
 
-  function addFile() {
-    if (!fileName.trim()) return;
-    setFiles((current) => [...current, { file_name: fileName.trim(), file_url: fileUrl.trim() }]);
-    setFileName('');
-    setFileUrl('');
+  function addFiles(event: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = '';
+    if (!selectedFiles.length) return;
+
+    if (existingFiles.length + newFiles.length + selectedFiles.length > 10) {
+      setError('添付資料は合計10件までです。');
+      return;
+    }
+
+    const invalidFile = selectedFiles.find((file) =>
+      file.size > 20 * 1024 * 1024 || !/\.(pdf|jpe?g|png|docx?|xlsx?)$/i.test(file.name)
+    );
+    if (invalidFile) {
+      setError('添付できるのは20MB以下のPDF、画像、Word、Excelファイルです。');
+      return;
+    }
+
+    setError('');
+    setNewFiles((current) => [...current, ...selectedFiles]);
   }
 
   if (loadingMasters) return <div className="loading-state">初期データを読み込んでいます</div>;
@@ -135,27 +153,33 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
           <div className="form-section-heading"><span>03</span><h2>添付資料</h2></div>
           <div className="attachment-entry">
             <label className="form-field">
-              <span>ファイル名</span>
-              <input className="field-control" value={fileName} onChange={(event) => setFileName(event.target.value)} placeholder="見積書.pdf" />
+              <span>ファイルを選択 <small>複数選択可・1ファイル20MBまで</small></span>
+              <input className="field-control" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" onChange={addFiles} />
             </label>
-            <label className="form-field">
-              <span>保存先URL</span>
-              <input className="field-control" type="url" value={fileUrl} onChange={(event) => setFileUrl(event.target.value)} placeholder="https://..." />
-            </label>
-            <button className="button button-outline" type="button" onClick={addFile} disabled={!fileName.trim()}>追加</button>
           </div>
-          {files.length > 0 && (
+          {existingFiles.length > 0 && (
             <ul className="attachment-list">
-              {files.map((file, index) => (
-                <li key={`${file.file_name}-${index}`}>
+              {existingFiles.map((file) => (
+                <li key={file.id}>
                   <span aria-hidden="true">↗</span>
-                  <span>{file.file_name}<small>{file.file_url || '保存先URL未指定'}</small></span>
-                  <button type="button" aria-label={`${file.file_name}を削除`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}>削除</button>
+                  <span><a href={file.file_url.startsWith('approvals/') ? approvalFileUrl(initial?.id ?? 0, file.id, currentUserId) : file.file_url} target="_blank" rel="noreferrer">{file.file_name}</a><small>保存済み</small></span>
+                  <button type="button" aria-label={`${file.file_name}を削除`} onClick={() => setExistingFiles((current) => current.filter((currentFile) => currentFile.id !== file.id))}>削除</button>
                 </li>
               ))}
             </ul>
           )}
-          <p className="field-note">現在はファイル本体ではなく、ファイル名と保存先URLを登録します。</p>
+          {newFiles.length > 0 && (
+            <ul className="attachment-list">
+              {newFiles.map((file, index) => (
+                <li key={`${file.name}-${index}`}>
+                  <span aria-hidden="true">＋</span>
+                  <span>{file.name}<small>{(file.size / (1024 * 1024)).toFixed(1)} MB ・ 新規追加</small></span>
+                  <button type="button" aria-label={`${file.name}を取り消す`} onClick={() => setNewFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}>削除</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="field-note">PDF、JPEG、PNG、Word、Excel形式に対応しています。</p>
         </div>
 
         {error && <div className="error-banner form-error" role="alert">{error}</div>}

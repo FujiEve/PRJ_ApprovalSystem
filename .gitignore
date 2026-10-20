@@ -20,6 +20,8 @@ yarn-error.log*
 # Backend (Laravel / PHP)
 vendor/
 backend/storage/*.key
+backend/storage/app/private/approvals/
+backend/storage/framework/testing/
 backend/storage/logs/*.log
 backend/bootstrap/cache/*.php
 backend/.phpunit.result.cache

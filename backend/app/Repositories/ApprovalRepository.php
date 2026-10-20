@@ -9,6 +9,10 @@ use App\Models\ApprovalHistory;
 use App\Models\ApprovalStatusMaster;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+use Throwable;
 
 class ApprovalRepository
 {
@@ -158,26 +162,57 @@ class ApprovalRepository
     /**
      * 添付ファイル一覧の同期（既存を論理削除して新規登録）
      */
-    public function syncFiles(int $approvalId, array $files): void
+    public function syncFiles(int $approvalId, array $uploads, ?array $retainedFileIds = null): array
     {
-        ApprovalFile::where('approval_id', $approvalId)->update(['is_deleted' => true]);
+        $deletedPaths = [];
+        if ($retainedFileIds !== null) {
+            $retainedIds = array_map('intval', $retainedFileIds);
+            $currentFiles = ApprovalFile::where('approval_id', $approvalId)
+                ->where('is_deleted', false)
+                ->get();
 
-        foreach ($files as $file) {
-            $fileName = isset($file['file_name']) ? trim((string) $file['file_name']) : '';
-            if ($fileName === '') {
-                continue;
+            foreach ($currentFiles as $currentFile) {
+                if (!in_array($currentFile->id, $retainedIds, true)) {
+                    $currentFile->update(['is_deleted' => true]);
+                    $deletedPaths[] = $currentFile->file_url;
+                }
             }
-            $fileUrl = isset($file['file_url']) && trim((string) $file['file_url']) !== ''
-                ? trim((string) $file['file_url'])
-                : 'https://example.local/files/' . rawurlencode($fileName);
-
-            ApprovalFile::create([
-                'approval_id' => $approvalId,
-                'file_name' => $fileName,
-                'file_url' => $fileUrl,
-                'is_deleted' => false,
-            ]);
         }
+
+        $storedPaths = [];
+        try {
+            foreach ($uploads as $upload) {
+                if (!$upload instanceof UploadedFile) {
+                    throw new RuntimeException('添付資料のアップロード形式が不正です。');
+                }
+
+                $path = $upload->store("approvals/{$approvalId}", 'local');
+                if ($path === false) {
+                    throw new RuntimeException('添付資料を保存できませんでした。');
+                }
+
+                $storedPaths[] = $path;
+                ApprovalFile::create([
+                    'approval_id' => $approvalId,
+                    'file_name' => $upload->getClientOriginalName(),
+                    'file_url' => $path,
+                    'is_deleted' => false,
+                ]);
+            }
+        } catch (Throwable $exception) {
+            Storage::disk('local')->delete($storedPaths);
+            throw $exception;
+        }
+
+        return ['stored_paths' => $storedPaths, 'deleted_paths' => $deletedPaths];
+    }
+
+    public function findFileById(int $approvalId, int $fileId): ?ApprovalFile
+    {
+        return ApprovalFile::where('approval_id', $approvalId)
+            ->where('id', $fileId)
+            ->where('is_deleted', false)
+            ->first();
     }
 
     /**

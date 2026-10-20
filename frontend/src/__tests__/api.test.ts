@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, departmentAndStore, formatCurrency, statusLabels, userRoleLabel } from '@/api';
+import { api, approvalFileUrl, departmentAndStore, formatCurrency, statusLabels, userRoleLabel } from '@/api';
 
 function mockJsonResponse(payload: unknown, ok = true, status = 200) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -38,6 +38,50 @@ describe('approval API client', () => {
     expect(new Headers(init.headers).get('Content-Type')).toBe('application/json');
   });
 
+  it('sends uploaded files as multipart data without overriding its content type', async () => {
+    const fetchMock = mockJsonResponse({ data: {}, message: 'created' });
+    const file = new File(['pdf'], 'estimate.pdf', { type: 'application/pdf' });
+
+    await api.createApproval(1, {
+      applicant_user_id: 1,
+      assignee_user_id: 3,
+      status_id: 3,
+      subject: '添付テスト',
+      files: [file],
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/approvals');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(new Headers(init.headers).get('Content-Type')).toBeNull();
+    expect((init.body as FormData).getAll('files[]')).toEqual([file]);
+  });
+
+  it('sends retained and removed attachment state with an edit request', async () => {
+    const fetchMock = mockJsonResponse({ data: {}, message: 'updated' });
+    const file = new File(['new pdf'], 'new.pdf', { type: 'application/pdf' });
+
+    await api.updateApproval(1, '12', {
+      user_id: 1,
+      assignee_user_id: 3,
+      status_id: 3,
+      subject: '編集済み',
+      files: [file],
+      existing_file_ids: [71],
+      sync_existing_files: true,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = init.body as FormData;
+    expect(url).toBe('/api/approvals/12');
+    expect(init.method).toBe('POST');
+    expect(body.get('_method')).toBe('PUT');
+    expect(body.get('existing_file_ids[]')).toBe('71');
+    expect(body.get('sync_existing_files')).toBe('1');
+    expect(body.getAll('files[]')).toEqual([file]);
+    expect(new Headers(init.headers).get('Content-Type')).toBeNull();
+  });
+
   it('preserves Laravel validation details in ApiError', async () => {
     mockJsonResponse({
       message: '入力内容を確認してください。',
@@ -71,5 +115,6 @@ describe('approval API client', () => {
     expect(userRoleLabel({ authority: 'applicant' })).toBe('一般ユーザ');
     expect(userRoleLabel({ authority: 'approver' })).toBe('管理ユーザ');
     expect(userRoleLabel({ authority: 'admin' })).toBe('管理ユーザ');
+    expect(approvalFileUrl(12, 34, 1)).toBe('/api/approvals/12/files/34?current_user_id=1');
   });
 });

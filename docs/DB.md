@@ -116,7 +116,7 @@
 | ID | `id` | `BIGINT` | NO | `PK`, `AUTO_INCREMENT` | ファイル一意ID |
 | 稟議_ID | `approval_id` | `BIGINT` | NO | `FK (approvals.id)` | 紐づく稟議ID |
 | ファイル名 | `file_name` | `VARCHAR(255)` | NO | | アップロード時の元ファイル名 |
-| 対象ファイルURL | `file_url` | `VARCHAR(1024)` | NO | | ストレージ上の保存先パスまたはURL |
+| ストレージパス | `file_url` | `VARCHAR(1024)` | NO | | private local disk上の相対パス（例: `approvals/{approval_id}/{stored-name}.pdf`）。公開URLは保存しない |
 | 作成日 | `created_at` | `DATETIME` | NO | `DEFAULT CURRENT_TIMESTAMP` | レコード作成日時 |
 | 更新日 | `updated_at` | `DATETIME` | NO | `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` | レコード更新日時 |
 | 削除フラグ | `is_deleted` | `BOOLEAN` | NO | `DEFAULT FALSE` | 論理削除フラグ |

@@ -137,7 +137,7 @@ PRJ_ApprovalSystem/
 
 ### 5.2. Webサーバ設計 (Nginx)
 - クライアント（またはNext.js）からの `/api/*` リクエストを受け付け、`fastcgi_pass` で Laravel (`php-fpm:9000`) の `public/index.php` にルーティングします。
-- アップロードファイル（`approval_files`）の容量制限（`client_max_body_size`）やCORSヘッダの付与を担います。
+- 添付アップロードの上限として`client_max_body_size 20M`を設定し、CORSヘッダを付与します。
 
 ### 5.3. バックエンド設計 (Laravel)
 ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ステータス遷移の整合性（業務ロジック）」** と **「データアクセス（DB操作）」** を明確に分離するため、`Controller → Service → Repository → Model` の4層構造を採用します。
@@ -152,6 +152,7 @@ ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ス�
 
 **Repository層 (`ApprovalRepository` / `MasterRepository`)**:
 - **DB操作・クエリ組み立て専任**: Eloquent (`Approval`, `ApprovalHistory`, `ApprovalComment`, `ApprovalFile`, `User` 等) を用いた検索フィルタの組み立て、悲観ロック (`lockForUpdate`)、レコード作成・更新処理を一元管理。
+- **ファイル保存**: 添付実体はLaravelのprivate local disk（`backend/storage/app/private/approvals/{approval_id}`）へ保存し、`approval_files.file_url`には相対パスを記録します。ダウンロードは閲覧権限を確認するAPI経由で行います。
 
 ### 5.4. テスト
 - バックエンド: `cd backend && php artisan test`（Unit / Feature）
@@ -165,9 +166,10 @@ ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ス�
 | --- | --- | --- | --- |
 | `GET` | `/api/masters` | 初期表示用のユーザ一覧、部署一覧、店舗一覧、ステータス一覧を取得 | 共通 |
 | `GET` | `/api/approvals` | 稟議一覧取得（申請者本人または担当者本人の稟議のみ。ステータス等で追加フィルタ） | 申請者本人 / 担当者本人 |
-| `POST` | `/api/approvals` | 稟議の新規作成（`status_id = 3: 下書き` または `0: 申請中` で保存） | 起案者 |
+| `POST` | `/api/approvals` | 稟議の新規作成。multipartで添付ファイルを追加可能 | 起案者 |
 | `GET` | `/api/approvals/{id}` | 稟議詳細取得（コメント・履歴・添付を含む）。下書きは申請者本人のみ | 申請者本人 / 担当者本人 |
-| `PUT` | `/api/approvals/{id}` | 下書き（`3`）または差し戻し（`2`）状態の稟議内容の編集・本申請/再申請 | 起案者 |
+| `GET` | `/api/approvals/{id}/files/{fileId}` | 添付ファイルのダウンロード（稟議の閲覧権限を適用） | 申請者本人 / 担当者本人 |
+| `PUT` | `/api/approvals/{id}` | 下書き（`3`）または差し戻し（`2`）状態の稟議編集・本申請/再申請。multipartで既存添付の保持・削除・新規追加が可能（フロントは`POST` + `_method=PUT`） | 起案者 |
 | `POST` | `/api/approvals/{id}/withdraw` | 申請中（`0`）の稟議を取り下げ、下書き（`3`）へ戻す | 起案者 |
 | `POST` | `/api/approvals/{id}/approve` | 申請中（`0`）の稟議を承認済み（`1`）へ変更（任意コメント同時登録） | 承認者 |
 | `POST` | `/api/approvals/{id}/remand` | 申請中（`0`）の稟議を差し戻し（`2`）へ変更（**コメント必須**） | 承認者 |
