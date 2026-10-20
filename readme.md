@@ -5,11 +5,10 @@ docker compose up --build -d
 ```
 
 - バックエンドAPI: http://localhost:8080/api/health
+- フロントエンド: http://localhost:3000
 - フロントエンド経由のAPI: http://localhost:3000/api/health
 
 ## バックエンドテスト
-
-バックエンドのLaravelプロジェクトに移動してテストを実行します。
 
 ```sh
 cd backend
@@ -36,18 +35,14 @@ npm test
 npm run test:watch
 ```
 
-## カバレッジ確認
+## Next.jsのローカル開発
 
-ブランチ（パス）カバレッジの計測には、PHPUnit 11とXdebugが必要です。Xdebugをインストール・有効化した上で、`XDEBUG_MODE=coverage` を指定します。
+Docker Composeのfrontendサービスは`frontend/`をbind mountするため、ホストとコンテナでNext.jsの生成物`.next`を共有します。Dockerのfrontendを起動したまま、ホスト側で別の`next dev`や`next build`を同時実行しないでください。
+
+manifestエラーなどが発生した場合は、frontendを停止して共有キャッシュを削除してから再起動します。
 
 ```sh
-cd backend
-
-# テキストで行・パスカバレッジを表示
-XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-text --path-coverage
-
-# HTMLレポートを生成（backend/coverage/index.html）
-XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-html coverage --path-coverage
+docker compose stop frontend
+rm -rf frontend/.next
+docker compose start frontend
 ```
-
-この環境にXdebugなどのカバレッジドライバーがない場合、テストは実行できますがカバレッジ率は出力されません。`--path-coverage` はXdebugを使って分岐経路を計測します。

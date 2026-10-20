@@ -8,7 +8,7 @@
 
 | レイヤー | 採用技術 | ホスティング先（本番公開） | 役割・選定理由 |
 | --- | --- | --- | --- |
-| **フロントエンド** | **Next.js** (React / TypeScript / App Router) | **Vercel** | ・モダンなUI構築と高速なページ遷移<br>・Vercelへのシームレスなデプロイと最適化 |
+| **フロントエンド** | **Next.js 15.5.28** (React 18 / TypeScript / App Router) | **Vercel** | ・一覧、起案、詳細・承認画面を提供<br>・Vitest 4 / React Testing LibraryでUI・APIクライアントをテスト |
 | **Webサーバ** | **Nginx** | **Render.com** (Docker) | ・リバースプロキシおよびLaravel (PHP-FPM) へのFastCGI通信<br>・静的ファイル配信、セキュリティヘッダ制御 |
 | **バックエンド** | **Laravel** (PHP 8.x / APIモード) | **Render.com** (Docker) | ・堅牢なルーティング、FormRequestによるバリデーション<br>・Eloquent ORMによるリレーション管理とトランザクション制御 |
 | **データベース** | **PostgreSQL** | **Supabase** | ・厳格な型制約・外部キー制約と高いトランザクション整合性<br>・SupabaseのマネージドPostgreSQL（および必要に応じたSupabase Storage連携） |
@@ -106,17 +106,16 @@ PRJ_ApprovalSystem/
     ├── Dockerfile              # ローカル開発用 Node.js (Next.js) コンテナ定義
     ├── src/
     │   ├── app/                # App Router ページ群
-    │   │   ├── layout.tsx      # 共通ヘッダ（操作ユーザ切替スイッチャー配置）
-    │   │   ├── page.tsx        # 稟議一覧画面（フィルタ・ステータスタブ）
+    │   │   ├── layout.tsx      # Workspace共通レイアウト・操作ユーザ切替
+    │   │   ├── page.tsx        # 稟議一覧（自分の申請 / 他人の承認）
     │   │   └── approvals/
     │   │       ├── new/page.tsx        # 稟議新規作成・下書き保存画面
     │   │       └── [id]/
     │   │           ├── page.tsx        # 稟議詳細・承認/差し戻し・コメント画面
     │   │           └── edit/page.tsx   # 下書き・差し戻し編集（再申請）画面
-    │   ├── components/         # UIコンポーネント（ステータスバッジ、履歴タイムライン等）
-    │   ├── contexts/           # 操作中ユーザ保持用 Context (UserSwitcherContext)
-    │   ├── lib/                # APIクライアント (fetch ラッパー)
-    │   └── types/              # TypeScript 型定義
+    │   ├── components/         # AppShell、WorkspaceContext、ApprovalForm
+    │   ├── api.ts              # APIクライアントとデータ型
+    │   └── __tests__/          # Vitest / React Testing Libraryテスト
     ├── next.config.mjs
     └── package.json
 ```
@@ -127,9 +126,11 @@ PRJ_ApprovalSystem/
 
 ### 5.1. フロントエンド設計 (Next.js)
 1. **擬似認証（操作ユーザ切替）の仕組み**
-   - ログイン画面を省略する仕様に合わせ、`UserSwitcherContext` で現在選択中のユーザ（起案者A、起案者B、承認者Cなど）を管理します。
-   - APIリクエスト時にカスタムヘッダ `X-Current-User-Id`（またはリクエストボディの `user_id`）を付与してLaravelへ送信します。
-2. **ステータスに応じたUI制御**
+    - ログイン画面を省略し、`WorkspaceContext`で現在の操作ユーザを管理します。選択は`localStorage`に保存し、`applicant`は「一般ユーザ」、`approver` / `admin`は「管理ユーザ」と表示します。
+    - APIリクエストに`X-Current-User-Id`を付けてLaravelへ送信します。これは課題用の擬似認証であり、本番の認証・本人確認の代替ではありません。
+2. **一覧のビュー切替**
+    - 「自分の申請」は`applicant_user_id`、「他人の承認」は`assignee_user_id`でAPIを絞ります。各ビュー内でステータス、キーワード、部署、店舗を追加フィルタできます。
+3. **ステータスに応じたUI制御**
    - `status_id === 1`（承認済み）: 編集ボタン・取り下げボタンを非表示（閲覧専用ロック）。
    - `status_id === 0`（申請中）: 起案者には「取り下げ」ボタン、承認者（担当者）には「承認」「差し戻し」フォームを表示。
    - `status_id === 2`（差し戻し）/ `3`（下書き）: 起案者に「編集」「申請（再申請）」ボタンを表示。
@@ -143,11 +144,18 @@ ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ス�
 
 - **Controller層**: リクエストの受取とJSONレスポンスの返却に専念（直接ModelやRepositoryは呼ばず、Serviceのみを呼び出す）。
 - **FormRequest層**: 必須項目チェック、差し戻し時のコメント必須チェックなどを実施。
-- **Service層 (`ApprovalWorkflowService` / `MasterService`)**:
-  - **業務ルール・状態遷移ガード**: 例えば「既に `1: 承認済み` の稟議に対する編集・取り下げリクエスト」や「`0: 申請中` 以外に対する承認・差し戻しリクエスト」をドメインエラー（`400` / `403`）として遮断。
-  - **DBトランザクション境界 (`DB::transaction`)**: 複数のRepository操作（稟議の更新、コメント追加、履歴記録）を単一トランザクションで束ね、データの不整合を防止。
-- **Repository層 (`ApprovalRepository` / `MasterRepository`)**:
-  - **DB操作・クエリ組み立て専任**: Eloquent (`Approval`, `ApprovalHistory`, `ApprovalComment`, `ApprovalFile`, `User` 等) を用いた検索フィルタの組み立て、悲観ロック (`lockForUpdate`)、レコード作成・更新処理を一元管理。
+**Service層 (`ApprovalWorkflowService` / `MasterService`)**:
+- **業務ルール・状態遷移ガード**: 承認済み稟議への編集・取り下げや、申請中以外への承認・差し戻しをドメインエラー（`400` / `403`）として遮断。
+- **閲覧権限ガード**: 一覧・詳細は申請者本人または担当者本人に限定し、下書きは申請者本人以外から隠す。操作ユーザ未指定時は一覧を空にし、詳細は拒否する。
+- **コメント状態遷移**: 申請者本人に限り、未読→既読→対応済みの順序遷移だけを許可する。
+- **DBトランザクション境界 (`DB::transaction`)**: 稟議更新、コメント追加、履歴記録を単一トランザクションで束ねる。
+
+**Repository層 (`ApprovalRepository` / `MasterRepository`)**:
+- **DB操作・クエリ組み立て専任**: Eloquent (`Approval`, `ApprovalHistory`, `ApprovalComment`, `ApprovalFile`, `User` 等) を用いた検索フィルタの組み立て、悲観ロック (`lockForUpdate`)、レコード作成・更新処理を一元管理。
+
+### 5.4. テスト
+- バックエンド: `cd backend && php artisan test`（Unit / Feature）
+- フロントエンド: `cd frontend && npm test`（Vitest / React Testing Library）
 
 ---
 
@@ -156,14 +164,15 @@ ControllerやServiceにDBクエリ操作が混在するのを防ぎ、**「ス�
 | HTTPメソッド | エンドポイント | 概要 | 実行ロール |
 | --- | --- | --- | --- |
 | `GET` | `/api/masters` | 初期表示用のユーザ一覧、部署一覧、店舗一覧、ステータス一覧を取得 | 共通 |
-| `GET` | `/api/approvals` | 稟議一覧取得（クエリパラメータでステータス、申請者、担当者フィルタ） | 共通 |
+| `GET` | `/api/approvals` | 稟議一覧取得（申請者本人または担当者本人の稟議のみ。ステータス等で追加フィルタ） | 申請者本人 / 担当者本人 |
 | `POST` | `/api/approvals` | 稟議の新規作成（`status_id = 3: 下書き` または `0: 申請中` で保存） | 起案者 |
-| `GET` | `/api/approvals/{id}` | 稟議詳細取得（紐づくコメント一覧・更新履歴一覧・添付ファイルを含む） | 共通 |
+| `GET` | `/api/approvals/{id}` | 稟議詳細取得（コメント・履歴・添付を含む）。下書きは申請者本人のみ | 申請者本人 / 担当者本人 |
 | `PUT` | `/api/approvals/{id}` | 下書き（`3`）または差し戻し（`2`）状態の稟議内容の編集・本申請/再申請 | 起案者 |
 | `POST` | `/api/approvals/{id}/withdraw` | 申請中（`0`）の稟議を取り下げ、下書き（`3`）へ戻す | 起案者 |
 | `POST` | `/api/approvals/{id}/approve` | 申請中（`0`）の稟議を承認済み（`1`）へ変更（任意コメント同時登録） | 承認者 |
 | `POST` | `/api/approvals/{id}/remand` | 申請中（`0`）の稟議を差し戻し（`2`）へ変更（**コメント必須**） | 承認者 |
-| `POST` | `/api/approvals/{id}/comments` | 稟議に対する通常コメントの追加 | 共通 |
+| `POST` | `/api/approvals/{id}/comments` | 稟議に対する通常コメントの追加（画面では閲覧可能な関係者が利用） | 操作ユーザ指定 |
+| `PATCH` | `/api/approvals/{id}/comments/{commentId}/status` | コメント状態を次段階へ更新（`0→1` / `1→2`） | 申請者本人 |
 
 ---
 

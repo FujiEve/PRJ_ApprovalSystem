@@ -125,7 +125,7 @@
 
 ### 2.7. 稟議コメント管理用DB (`approval_comments`)
 
-承認時・差し戻し時のフィードバックや質疑応答コメントを管理します。
+承認時・差し戻し時のフィードバックや質疑応答コメントと、その対応状態を管理します。
 
 | 論理名 | 物理名 | データ型 | NULL | 制約 / デフォルト値 | 備考 |
 | --- | --- | --- | --- | --- | --- |
@@ -137,6 +137,12 @@
 | 作成日 | `created_at` | `DATETIME` | NO | `DEFAULT CURRENT_TIMESTAMP` | レコード作成日時 |
 | 更新日 | `updated_at` | `DATETIME` | NO | `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` | レコード更新日時 |
 | 削除フラグ | `is_deleted` | `BOOLEAN` | NO | `DEFAULT FALSE` | 論理削除フラグ |
+
+`status`の値は`0: 未読`、`1: 既読`、`2: 対応済み`です。スキーマ上の値域は整数ですが、更新時はServiceで次の業務制約を検証します。
+
+- 対象稟議の申請者本人だけが変更できます。
+- 許可する遷移は`0 → 1`（未読から既読）と`1 → 2`（既読から対応済み）のみです。
+- 逆戻り、段階の飛び越し、対応済みからの変更は拒否します。
 
 ---
 
@@ -246,7 +252,7 @@ erDiagram
         boolean is_deleted
     }
 
-    approval_statuses {
+    approval_statuses_master {
         int id PK
         varchar name
         text memo
