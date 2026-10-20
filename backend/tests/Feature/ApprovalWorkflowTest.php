@@ -296,7 +296,11 @@ class ApprovalWorkflowTest extends TestCase
         $fileId = $response->json('data.files.0.id');
         $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}", [
             'X-Current-User-Id' => '1',
-        ])->assertOk();
+        ])->assertOk()->assertHeader('Content-Disposition', 'attachment; filename=estimate.pdf');
+        $inline = $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}?inline=1", [
+            'X-Current-User-Id' => '1',
+        ])->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->assertStringStartsWith('inline', $inline->headers->get('Content-Disposition'));
         $this->getJson("/api/approvals/{$response->json('data.id')}/files/{$fileId}", [
             'X-Current-User-Id' => '3',
         ])->assertOk();

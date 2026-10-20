@@ -231,6 +231,11 @@ button { color: inherit; }
 .detail-attachments p { margin: 0; color: var(--ink-soft); font-size: 10px; }
 .detail-attachments ul { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
 .detail-attachments a { display: inline-block; padding: 7px 10px; color: var(--forest); background: #f2f5eb; border: 1px solid var(--line); font-size: 10px; }
+.detail-attachments li { display: flex; align-items: center; gap: 6px; }
+.preview-toggle { padding: 6px 9px; color: var(--forest); background: transparent; border: 1px solid var(--line); cursor: pointer; font-size: 10px; }
+.attachment-preview { margin-top: 12px; border: 1px solid var(--line); background: #fff; }
+.attachment-preview img { display: block; max-width: 100%; max-height: 640px; margin: 0 auto; }
+.attachment-preview iframe { display: block; width: 100%; height: 640px; border: 0; }
 .detail-attachments a:hover { background: #e8efd9; }
 .action-panel { display: grid; gap: 10px; padding: 18px; }
 .action-panel h2 { margin: 2px 0 0; font-size: 14px; }

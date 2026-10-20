@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ApprovalController extends Controller
 {
+    private const INLINE_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
     public function __construct(
         private readonly ApprovalWorkflowService $workflowService
     ) {
@@ -80,7 +81,16 @@ class ApprovalController extends Controller
         $currentUserId = $this->resolveCurrentUserId($request);
         $file = $this->workflowService->getApprovalFile($id, $fileId, $currentUserId);
 
-        return Storage::disk('local')->download($file->file_url, $file->file_name);
+        $disk = Storage::disk('local');
+
+        // 画面内プレビュー用: 画像とPDFのみインライン表示を許可する
+        if ($request->boolean('inline') && in_array($disk->mimeType($file->file_url), self::INLINE_MIME_TYPES, true)) {
+            return $disk->response($file->file_url, $file->file_name, [
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
+        return $disk->download($file->file_url, $file->file_name);
     }
 
     /**

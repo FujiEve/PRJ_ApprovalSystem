@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api, approvalFileUrl, departmentAndStore, formatCurrency, formatDate, statusLabels, type Approval } from '@/api';
+import { api, approvalFileUrl, departmentAndStore, filePreviewKind, formatCurrency, formatDate, statusLabels, type Approval } from '@/api';
 import { useWorkspace } from '@/components/WorkspaceContext';
 
 const commentStatuses = ['未読', '既読', '対応済み'];
@@ -27,7 +27,7 @@ export default function ApprovalDetailPage() {
   const [actionComment, setActionComment] = useState('');
   const [newComment, setNewComment] = useState('');
   const [busy, setBusy] = useState(false);
-
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
   useEffect(() => {
     if (!currentUser) return;
     let active = true;
@@ -146,7 +146,30 @@ export default function ApprovalDetailPage() {
             <div className="detail-attachments">
               <h2>添付資料 <span>{approval.files?.length ?? 0}</span></h2>
               {approval.files?.length ? (
-                <ul>{approval.files.map((file) => <li key={file.id}><a href={file.file_url.startsWith('approvals/') ? approvalFileUrl(approval.id, file.id, currentUserId) : file.file_url} target="_blank" rel="noreferrer">{file.file_name}<span aria-hidden="true"> ↗</span></a></li>)}</ul>
+                <>
+                  <ul>{approval.files.map((file) => {
+                    const stored = file.file_url.startsWith('approvals/');
+                    const kind = stored ? filePreviewKind(file.file_name) : null;
+                    return (
+                      <li key={file.id}>
+                        <a href={stored ? approvalFileUrl(approval.id, file.id, currentUserId) : file.file_url} target="_blank" rel="noreferrer">{file.file_name}<span aria-hidden="true"> ↗</span></a>
+                        {kind && (
+                          <button type="button" className="preview-toggle" onClick={() => setPreviewFileId(previewFileId === file.id ? null : file.id)}>
+                            {previewFileId === file.id ? 'プレビューを閉じる' : 'プレビュー'}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}</ul>
+                  {approval.files.filter((file) => file.id === previewFileId).map((file) => (
+                    <div className="attachment-preview" key={file.id}>
+                      {filePreviewKind(file.file_name) === 'image'
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={approvalFileUrl(approval.id, file.id, currentUserId, true)} alt={file.file_name} />
+                        : <iframe src={approvalFileUrl(approval.id, file.id, currentUserId, true)} title={file.file_name} />}
+                    </div>
+                  ))}
+                </>
               ) : <p>添付資料はありません。</p>}
             </div>
           </section>

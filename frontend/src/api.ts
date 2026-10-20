@@ -202,8 +202,14 @@ export function userRoleLabel(user: Pick<User, 'authority'>): string {
   return user.authority === 'applicant' ? '一般ユーザ' : '管理ユーザ';
 }
 
-export function approvalFileUrl(approvalId: number, fileId: number, userId: number): string {
-  return `/api/approvals/${approvalId}/files/${fileId}?current_user_id=${userId}`;
+export function approvalFileUrl(approvalId: number, fileId: number, userId: number, inline = false): string {
+  return `/api/approvals/${approvalId}/files/${fileId}?current_user_id=${userId}${inline ? '&inline=1' : ''}`;
+}
+
+export function filePreviewKind(fileName: string): 'image' | 'pdf' | null {
+  if (/\.(jpe?g|png)$/i.test(fileName)) return 'image';
+  if (/\.pdf$/i.test(fileName)) return 'pdf';
+  return null;
 }
 
 export function departmentAndStore(user: User | null | undefined): string {
