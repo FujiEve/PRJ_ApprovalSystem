@@ -209,6 +209,32 @@ class ApprovalWorkflowTest extends TestCase
         $this->getJson('/api/approvals/99999')->assertNotFound();
     }
 
+    public function test_applicant_cannot_be_the_approval_assignee(): void
+    {
+        $this->postJson('/api/approvals', [
+            'applicant_user_id' => 1,
+            'assignee_user_id' => 1,
+            'status_id' => 3,
+            'subject' => '担当者重複の稟議',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['assignee_user_id']);
+
+        $approvalId = $this->postJson('/api/approvals', [
+            'applicant_user_id' => 1,
+            'assignee_user_id' => 3,
+            'status_id' => 3,
+            'subject' => '担当者重複の稟議',
+        ])->assertCreated()->json('data.id');
+
+        $this->putJson("/api/approvals/{$approvalId}", [
+            'user_id' => 1,
+            'assignee_user_id' => 1,
+            'status_id' => 3,
+            'subject' => '担当者重複の稟議',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['assignee_user_id']);
+    }
+
     public function test_create_approval_accepts_and_stores_uploaded_attachments(): void
     {
         Storage::fake('local');
@@ -357,4 +383,3 @@ class ApprovalWorkflowTest extends TestCase
             ->assertJsonValidationErrors(['content']);
     }
 }
-

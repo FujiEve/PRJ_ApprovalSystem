@@ -11,6 +11,7 @@ use App\Repositories\MasterRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
@@ -131,6 +132,13 @@ class ApprovalWorkflowService
                 throw new HttpException(403, '起案者本人のみ編集・再申請が可能です。');
             }
 
+            $assigneeId = (int) ($data['assignee_user_id'] ?? $approval->assignee_user_id);
+            if ($assigneeId === $approval->applicant_user_id) {
+                throw ValidationException::withMessages([
+                    'assignee_user_id' => '起案者と承認担当者は別のユーザを選択してください。',
+                ]);
+            }
+
             $previousStatus = $approval->status_id;
             $nextStatus = (int) ($data['status_id'] ?? $previousStatus);
 
@@ -142,7 +150,6 @@ class ApprovalWorkflowService
                 throw new HttpException(400, '不正な遷移先ステータスです。');
             }
 
-            $assigneeId = (int) ($data['assignee_user_id'] ?? $approval->assignee_user_id);
             $assigneeName = $this->resolveAssigneeName($assigneeId, $data['assignee_name'] ?? null);
 
             $this->approvalRepository->update($approval, [
@@ -425,4 +432,3 @@ class ApprovalWorkflowService
         return $trimmed !== '' ? $trimmed : '未定';
     }
 }
-

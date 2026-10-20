@@ -60,11 +60,18 @@ const approver: User = {
   authority: 'approver',
 };
 
+const admin: User = {
+  ...applicant,
+  id: 4,
+  name: '高橋 誠',
+  authority: 'admin',
+};
+
 function useApplicantWorkspace() {
   mocks.workspace = {
     currentUserId: 1,
     currentUser: applicant,
-    masters: { users: [applicant, approver] },
+    masters: { users: [applicant, approver, admin] },
     loadingMasters: false,
   };
 }
@@ -145,17 +152,26 @@ describe('ApprovalForm', () => {
     })));
   });
 
-  it('blocks approver users from creating an application', () => {
+  it('allows admin users to create applications without selecting themselves as approver', async () => {
+    const user = userEvent.setup();
     mocks.workspace = {
       ...mocks.workspace,
-      currentUserId: 3,
-      currentUser: approver,
+      currentUserId: 4,
+      currentUser: admin,
     };
 
     render(<ApprovalForm />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('一般ユーザに切り替えてください。');
-    expect(screen.queryByRole('button', { name: '申請する' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /高橋 誠/ })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/件名/), '管理者起案の稟議');
+    await user.click(screen.getByRole('button', { name: '下書き保存' }));
+
+    await waitFor(() => expect(mocks.createApproval).toHaveBeenCalledWith(4, expect.objectContaining({
+      applicant_user_id: 4,
+      assignee_user_id: 0,
+      status_id: 3,
+      subject: '管理者起案の稟議',
+    })));
   });
 
   it('updates an existing approval using the actor user id', async () => {

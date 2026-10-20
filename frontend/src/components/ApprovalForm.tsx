@@ -32,6 +32,10 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
   async function save(statusId: number) {
     if (!formRef.current?.reportValidity()) return;
     setError('');
+    if (assigneeId === currentUserId) {
+      setError('起案者と承認担当者は別のユーザを選択してください。');
+      return;
+    }
     if (statusId === 0) {
       if (!amount || !Number.isInteger(Number(amount)) || Number(amount) < 0) {
         setError('申請時は0円以上の整数金額を入力してください。');
@@ -96,8 +100,8 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
   }
 
   if (loadingMasters) return <div className="loading-state">初期データを読み込んでいます</div>;
-  if (!currentUser || currentUser.authority !== 'applicant') {
-    return <div className="error-banner" role="alert">一般ユーザに切り替えてください。</div>;
+  if (!currentUser) {
+    return <div className="error-banner" role="alert">操作ユーザを選択してください。</div>;
   }
 
   return (
@@ -125,7 +129,9 @@ export default function ApprovalForm({ initial }: ApprovalFormProps) {
               <span>承認担当者</span>
               <select className="field-control" value={assigneeId} onChange={(event) => setAssigneeId(Number(event.target.value))}>
                 <option value={0}>未定・外部</option>
-                {masters?.users.filter((user) => user.authority === 'approver' || user.authority === 'admin').map((user) => (
+                {masters?.users.filter((user) =>
+                  user.id !== currentUserId && (user.authority === 'approver' || user.authority === 'admin')
+                ).map((user) => (
                   <option key={user.id} value={user.id}>{user.name} / {user.position ?? user.department?.name ?? '管理ユーザ'}</option>
                 ))}
               </select>

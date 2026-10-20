@@ -34,7 +34,12 @@ class StoreApprovalRequest extends FormRequest
 
         return [
             'applicant_user_id' => ['required', 'integer', 'exists:users,id'],
-            'assignee_user_id' => ['required', 'integer', 'exists:users,id'],
+            'assignee_user_id' => [
+                'required',
+                'integer',
+                'exists:users,id',
+                Rule::notIn([(int) $this->input('applicant_user_id')]),
+            ],
             'assignee_name' => ['nullable', 'string', 'max:100'],
             'status_id' => ['required', 'integer', Rule::in([0, 3])],
             'subject' => ['required', 'string', 'min:1', 'max:255'],
@@ -64,7 +69,7 @@ class StoreApprovalRequest extends FormRequest
             'reason.required' => '申請時は理由の入力が必須です。',
             'reason.regex' => '理由に空白のみの入力はできません。',
             'status_id.in' => '新規作成時は「申請中(0)」または「下書き(3)」のみ指定可能です。',
+            'assignee_user_id.not_in' => '起案者と承認担当者は別のユーザを選択してください。',
         ];
     }
 }
-

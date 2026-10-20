@@ -42,9 +42,9 @@ function ShellContent({ children }: { children: React.ReactNode }) {
             <Link className={`nav-link ${pathname === '/' ? 'is-active' : ''}`} href="/">
               <span className="nav-index">01</span><span>稟議一覧</span>
             </Link>
-            {!isApprover && <Link className={`nav-link ${pathname === '/approvals/new' ? 'is-active' : ''}`} href="/approvals/new">
+            <Link className={`nav-link ${pathname === '/approvals/new' ? 'is-active' : ''}`} href="/approvals/new">
               <span className="nav-index">02</span><span>新規起案</span>
-            </Link>}
+            </Link>
           </nav>
           <div className="sidebar-rule" />
           <div className="sidebar-caption">CURRENT USER</div>
