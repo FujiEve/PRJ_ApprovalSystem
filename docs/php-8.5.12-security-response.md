@@ -55,17 +55,18 @@ PHP 8.5.12 がセキュリティリリースとして公開された（NEWS 日�
 
 | 項目 | 内容 |
 |---|---|
-| PHP バージョン | `backend/Dockerfile` を `php:8.5-fpm-alpine` に、CI（`.github/workflows/backend-deploy.yml`）を `php-version: '8.5'` に変更。ローカルで 8.5.11 を確認し、全40テスト通過 |
+| PHP バージョン | 公式イメージ `php:8.5.12-fpm-alpine` の公開を確認。`backend/Dockerfile` を `php:8.5.12-fpm-alpine` に、CI（`.github/workflows/backend-deploy.yml`）を `php-version: '8.5.12'` に変更。ローカルで `--no-cache` 再ビルドし、`php -v` が 8.5.12、`pdo_pgsql` / `mbstring` 有効、`/api/health` 200、全40テスト通過を確認 |
 | PHP 設定（`backend/docker/php.ini`） | `max_file_uploads=10`、`max_input_vars=1000`、`max_input_nesting_level=16`、`max_input_time=30` を追加（`post_max_size=210M` はアプリ上限の 20MB × 10 件に合わせて維持） |
 | nginx（`backend/docker/default.conf`） | `client_body_timeout 30s`、`client_header_timeout 15s`、`large_client_header_buffers 4 8k` を追加（`client_max_body_size` は 210M を維持） |
 | 動作確認 | ローカルで再ビルドし、設定値の反映・nginx 設定テスト・`/api/health`・ファイル添付付きの申請作成を確認 |
 
 ### 4.2 今後の対応
 
-1. 公式イメージ `php:8.5.12-fpm-alpine`（または `8.5-fpm-alpine` の更新）の公開を確認する。
-2. ローカルで `docker compose build --no-cache backend` を実行し、`php -v` が 8.5.12 であることを確認する。全テストを実行する。
-3. Render の **新旧2サービスとも** 「Clear build cache & deploy」で再デプロイする（GitHub Actions の Deploy Hook でも可。ただしキャッシュが残るため、手動の方が確実）。
-4. `/api/health` と画面の動作を確認する。
+1. ~~公式イメージ `php:8.5.12-fpm-alpine` の公開を確認する。~~ 完了（4.1 参照）
+2. ~~ローカルで再ビルドし、`php -v` と全テストを確認する。~~ 完了（4.1 参照）
+3. 【未実施】Dockerfile / CI の変更を main に push する。
+4. 【未実施】Render の **新旧2サービスとも** 「Clear build cache & deploy」で再デプロイする（GitHub Actions の Deploy Hook でも可。ただしキャッシュが残るため、手動の方が確実）。
+5. 【未実施】`/api/health` と画面の動作を確認する。
 
 ### 4.3 余裕のあるときに実施（任意）
 
